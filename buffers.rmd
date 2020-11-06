@@ -21,22 +21,15 @@ db$longitud <- as.numeric(db$longitud)
 
 ```
 
+#### Function for generating buffers
+
 ```{r}
+# call our function for calculating buffers
 buff_mock <- calc_buffers(db, 3000)
+# extract relevant elements
 df_buffers <- buff_mock$df_buffers
 proj_buffers <- buff_mock$buffers_proj
 ```
-
-```{r}
-map_buffers(proj_buffers, df_buffers)
-```
-
-
-#### Function for generating buffers
-```{r}
-
-```
-
 
 #### Saving the generated buffers
 ```{r}
@@ -46,6 +39,7 @@ map_buffers(proj_buffers, df_buffers)
 #### Visualizing buffers in maps
 
 ```{r}
-
+# map
+map_buffers(proj_buffers, df_buffers)
 ```
 
