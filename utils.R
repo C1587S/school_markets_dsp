@@ -51,10 +51,31 @@ calc_buffers <- function(df, radious){
 
 
 map_buffers <- function(proj_buffers, df_buffers){
-  leaflet() %>%
+  m <-leaflet() %>%
     addProviderTiles(providers$Stamen.TonerLite,
                      options = providerTileOptions(noWrap = TRUE)) %>%
     addPolygons(data=proj_buffers, weight = 3, fillColor = "yellow") %>% 
     addCircleMarkers(data=df_buffers, ~longitud, ~latitud, color = "red", stroke = FALSE, fillOpacity = 0.5,radius=2,
                      label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)))
+  # adds menu for visualization
+  m %>% setView(0,0,3)
+  esri <- grep("^Esri", providers, value = TRUE)
+  for (provider in esri) {
+    m <- m %>% addProviderTiles(provider, group = provider)
+  }
+  m %>%
+    addLayersControl(baseGroups = names(esri),
+                     options = layersControlOptions(collapsed = FALSE)) %>%
+    addMiniMap(tiles = esri[[1]], toggleDisplay = TRUE,
+               position = "bottomleft") %>%
+    htmlwidgets::onRender("
+    function(el, x) {
+      var myMap = this;
+      myMap.on('baselayerchange',
+        function (e) {
+          myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
+        })
+    }")
+  
+  
 }
