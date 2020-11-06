@@ -1,0 +1,72 @@
+## Notebook for computing buffers
+
+```{r}
+source('utils.R')
+```
+
+#### Load the data
+```{r}
+# master_db <- readRDS("./data/db_master.rds")
+# master_db <- master_db %>% na.omit() %>% unique() %>% select(cct, latitud, longitud)
+# 
+# master_db$latitud <- as.character(master_db$latitud)
+# master_db$longitud <- as.character(master_db$longitud)
+# 
+# master_db <- master_db[(which(nchar(master_db$latitud) >= 7)),]
+# master_db <- master_db[(which(nchar(master_db$longitud) >= 9)),]
+# 
+# saveRDS(master_db, "./data/master_db_filtered.rds")
+db <- readRDS("./data/master_db_filtered.rds")
+```
+
+#### Preparing the data for computing buffers
+
+```{r}
+library(leaflet)
+library(mapview)
+db <- sample_n(db, 4000)
+db$latitud <- as.numeric(db$latitud)
+db$longitud <- as.numeric(db$longitud)
+# Spatial dataframe
+sp_df <- st_as_sf(x = db, coords = c("longitud", "latitud"),
+                  crs = "+init=epsg:6370 +proj=longlat +datum=WGS84")
+sp_df
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+# # simple plot
+# plot(my.sf.point)
+
+# interactive map:
+library(mapview)
+mapview(my.sp.point)
+
+# convert to sp object if needed
+my.sp.point <- as(my.sf.point, "Spatial")
+my.sp.point
+```
+
+#### Function for generating buffers
+```{r}
+
+```
+
+
+#### Saving the generated buffers
+```{r}
+
+```
+
+#### Visualizing buffers in maps
+
+```{r}
+
+```
+
