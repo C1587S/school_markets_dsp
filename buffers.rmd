@@ -22,7 +22,7 @@ db$longitud <- as.numeric(db$longitud)
 #### Function for generating buffers
 ```{r}
 # call our function for calculating buffers
-buff_test <- calc_buffers(db, 4000)
+buff_test <- calc_buffers(db, 5000)
 # extract relevant elements
 df_buffers <- buff_test$df_buffers
 proj_buffers <- buff_test$buffers_proj
@@ -38,14 +38,27 @@ proj_buffers <- readRDS("./data/proj_buffers_test.rds")
 
 # convert buffers with one and two schools in polygons
 ```{r}
-proj_buffers
+
 ```
+
 
 #### Calculate convex hulls
 ```{r}
 ch_df <- calc_convexhulls(df_buffers)
-ch_df
 ```
+
+## Unions first attempt
+```{r}
+unions <- st_union(ch_df$ch_polygons) %>% st_collection_extract("POLYGON") %>%  st_sf()
+unions
+union_ch <- st_union(ch_df$ch_polygons) %>% st_collection_extract("POLYGON")  %>%  st_sf()
+  
+  
+leaflet() %>%
+    addTiles() %>% 
+    addPolygons(data=unions, weight = 3, fillColor = "green", group = "Buffers")
+```
+
 
 #### Visualizing buffers in maps
 ```{r}
@@ -66,16 +79,18 @@ map_buffers_v2(proj_buffers, df_buffers)
                 iconUrl = './data/school_icon.png',
                  iconSize = c(75, 75))) %>% 
   # convexhulls
-  addPolygons(data=hulls_sf$polygons, group = "Convex Hulls",
+  addPolygons(data=ch_df$ch_polygons, group = "Convex Hulls",
               stroke = FALSE, smoothFactor = 0.2, fillOpacity = 0.2, fillColor="red") %>% 
   # Buffers
   addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>%
+  # Unions
+  addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Convex Hull Unions") %>% 
 
   # Additionals
     # Layers control
     addLayersControl(
     # baseGroups = c("OSM (default)", "Toner", "Toner Lite"),
-    overlayGroups = c("Schools", "Buffers", "Convex Hulls"),
+    overlayGroups = c("Schools", "Buffers", "Convex Hulls", "Convex Hull Unions"),
     options = layersControlOptions(collapsed = FALSE)
   ) %>% 
   clearBounds()
