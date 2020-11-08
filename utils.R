@@ -55,7 +55,8 @@ map_buffers <- function(proj_buffers, df_buffers){
     addProviderTiles(providers$Stamen.TonerLite,
                      options = providerTileOptions(noWrap = TRUE)) %>%
     addPolygons(data=proj_buffers, weight = 3, fillColor = "yellow") %>% 
-    addCircleMarkers(data=df_buffers, ~longitud, ~latitud, color = "red", stroke = FALSE, fillOpacity = 0.5,radius=2,
+    addCircleMarkers(data=df_buffers, ~longitud, ~latitud, color = "red", 
+                    stroke = FALSE, fillOpacity = 0.5,radius=2,
                      label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)))
   # adds menu for visualization
   m %>% setView(0,0,3)
@@ -75,7 +76,21 @@ map_buffers <- function(proj_buffers, df_buffers){
         function (e) {
           myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
         })
-    }")
+    }") %>% 
+  clearBounds()
   
-  
+}
+
+
+map_buffers_v2 <- function(proj_buffers, df_buffers){
+  leaflet() %>%
+    addTiles() %>% 
+    addMarkers(data=df_buffers, ~longitud, ~latitud,
+               clusterOptions = markerClusterOptions(),
+               label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
+               icon = list(
+                 iconUrl = './data/school_icon.png',
+                 iconSize = c(75, 75))
+    ) %>% 
+    clearBounds()
 }
