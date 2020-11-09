@@ -146,32 +146,20 @@ map_buffers_v2 <- function(proj_buffers, df_buffers){
 }
 
 
-#### Network algorithms
 #-----------------------------
 # Build graph
 #-----------------------------
-
-get_relations <- function(df){
-  u_cct_o <-df %>% distinct(cct_o, .keep_all = TRUE) %>% 
-    select(cct_o, latitud_o, longitud_o) %>% 
-    rename(lat = latitud_o, lon = longitud_o, name = cct_o)
-  
-  u_cct_d <- df %>% distinct(cct_d, .keep_all = TRUE) %>% 
-    select(cct_d, latitud_d, longitud_d) %>% 
-    rename(lat = latitud_d, lon = longitud_d, name = cct_d)
-  
-  nodos <- rbind(u_cct_d, u_cct_o) %>% 
-    distinct(name, .keep_all = TRUE)
-  
+get_relations <- function(nodos, df) {
   relations <- df %>%
-    filter(distancia<30) %>% 
+    filter(distancia<30) %>%
     filter(numDest >1) %>% 
     mutate(proporcion = numDest/numSalen) %>%  # Tipo page-rank. numSalen 
     mutate(cct_d_u = ifelse(cct_d < cct_o, cct_d, cct_o)) %>%
     mutate(cct_o_u = ifelse(cct_d < cct_o, cct_o, cct_d)) %>%
     group_by(cct_d_u, cct_o_u) %>%
-    dplyr::summarise(weight_proporcion = sum(proporcion),
-                     weight = sum(numDest)) %>%
+    dplyr::summarise(total_cambian = sum(numSalen),
+                     flujo = sum(numDest),
+                     weight = flujo /total_cambian, `.groups`="drop") %>%
     ungroup() %>% 
     rename(cct_d = cct_d_u, cct_o = cct_o_u) %>% 
     rename(name = cct_d) %>% 
@@ -179,79 +167,19 @@ get_relations <- function(df){
     rename( cct_d =name , latitud_d = lat, longitud_d = lon) %>% 
     rename(name = cct_o) %>% 
     left_join(nodos, by= c("name")) %>% 
-    rename( cct_o =name , latitud_o = lat, longitud_o = lon)
-  
+    rename( cct_o =name , latitud_o = lat, longitud_o = lon) %>% 
+    na.omit()
   return(relations)
-}
-
-get_relations_v2 <- function(df, nodos){
-  # df <- df_sec
-  # u_cct_o <-df %>% distinct(cct_o, .keep_all = TRUE) %>% 
-  #   select(cct_o, latitud_o, longitud_o) %>% 
-  #   rename(lat = latitud_o, lon = longitud_o, name = cct_o)
-  # 
-  # u_cct_d <- df %>% distinct(cct_d, .keep_all = TRUE) %>% 
-  #   select(cct_d, latitud_d, longitud_d) %>% 
-  #   rename(lat = latitud_d, lon = longitud_d, name = cct_d)
-  # 
-  # nodos <- rbind(u_cct_d, u_cct_o) %>% 
-  #   distinct(name, .keep_all = TRUE)
-  
-  relations <- df %>%
-    filter(distancia<30) %>% 
-    filter(numDest >1) %>% 
-    mutate(proporcion = numDest/numSalen) %>%  # Tipo page-rank. numSalen 
-    mutate(cct_d_u = ifelse(cct_d < cct_o, cct_d, cct_o)) %>%
-    mutate(cct_o_u = ifelse(cct_d < cct_o, cct_o, cct_d)) %>%
-    group_by(cct_d_u, cct_o_u) %>%
-    dplyr::summarise(weight_proporcion = sum(proporcion),
-                     weight = sum(numDest)) %>%
-    ungroup() %>% 
-    rename(cct_d = cct_d_u, cct_o = cct_o_u) %>% 
-    rename(name = cct_d) %>% 
-    left_join(nodos, by= c("name")) %>% 
-    rename( cct_d =name , latitud_d = lat, longitud_d = lon) %>% 
-    rename(name = cct_o) %>% 
-    left_join(nodos, by= c("name")) %>% 
-    rename( cct_o =name , latitud_o = lat, longitud_o = lon)
-  
-  return(relations)
-}
-
-get_select_relations <- function(nodos, current_group){
-  select_nodos <- nodos %>% filter(grupo == current_group)
-  
-  # Encontrar las relaciones entre los nodos del mismo grupo
-  select_relations_o <- relations %>% rename(name = cct_o) %>% 
-    inner_join(select_nodos, by = c("name")) %>% 
-    rename(cct_o = name)
-  
-  select_relations_od <- select_relations_o  %>% rename(name = cct_d) %>% 
-    inner_join(select_nodos, by = c("name")) %>% 
-    rename(cct_d = name) 
-  
-  select_relations_d <- relations  %>% rename(name = cct_d) %>% 
-    inner_join(select_nodos, by = c("name")) %>% 
-    rename(cct_d = name)
-  
-  select_relations_do <- select_relations_d  %>% rename(name = cct_o) %>% 
-    inner_join(select_nodos, by = c("name")) %>% 
-    rename(cct_o = name) 
-  
-  select_relations <- rbind(select_relations_do, select_relations_od) %>% 
-    distinct(cct_o, cct_d, .keep_all = TRUE)
-  
-  return(select_relations)
 }
 
 get_select_nodos <- function(select_relations,current_group){
   # Crear nodos 
   u_cct_o <-select_relations%>% distinct(cct_o, .keep_all = TRUE) %>% 
-    select(cct_o, latitud_o, longitud_o) %>% 
+    dplyr::select(cct_o, latitud_o, longitud_o) %>% 
     rename(lat = latitud_o, lon = longitud_o, name = cct_o)
   
   u_cct_d <- select_relations %>% distinct(cct_d, .keep_all = TRUE) %>% 
-    select(cct_d, latitud_d, longitud_d) %>% 
+    dplyr::select(cct_d, latitud_d, longitud_d) %>% 
     rename(lat = latitud_d, lon = longitud_d, name = cct_d)
   
   select_nodos<- rbind(u_cct_d, u_cct_o) %>% distinct(name, .keep_all = TRUE)
@@ -286,7 +214,7 @@ save_map <- function(select_nodos,algorithm, current_group,num_plot=10){
       n = n()
     ) %>% arrange(desc(n)) %>% 
     top_n(num_plot) %>% 
-    select(sub_grupo)
+    dplyr::select(sub_grupo)
   
   plot_group <- select_nodos %>% 
     filter(!is.na(lat)) %>% 
@@ -297,7 +225,7 @@ save_map <- function(select_nodos,algorithm, current_group,num_plot=10){
               size = I(1), 
               mapcolor = "bw")
   
-  file_name <- str_c("./../results/school_clusters/maps/",
+  file_name <- str_c("./data/results/school_clusters/maps/",
                      algorithm, "_group_",current_group,".png")
   ggsave(filename = file_name, g)
 }
@@ -312,9 +240,10 @@ save_subgroups <- function(fc, select_nodos,algorithm,current_group){
     select_nodos$sub_grupo[i] <- fccommunity[escuela][[1]]
   }
   
-  file_name <- str_c("./../results/school_clusters/groups/select_nodos/",
+  file_name <- str_c("./data/results/school_clusters/groups/select_nodos/",
                      algorithm, "_group_",current_group,".csv")
-  sub_df <- select_nodos %>% select(name, grupo, sub_grupo)
+  sub_df <- select_nodos %>% 
+    dplyr::select(name, grupo, sub_grupo)
   write_csv(sub_df,file_name)
   return(select_nodos)
 }
@@ -378,7 +307,7 @@ get_stats_group <- function(select_nodos, algorithm, current_group) {
   }
   
   sub_results <- sub_results %>% filter(priv != -1)
-  file_name <- str_c("./../results/school_clusters/groups/group_stats/",
+  file_name <- str_c("./../../results/school_clusters/groups/group_stats/",
                      algorithm, "_group_",current_group,".csv")
   
   write.csv(round(sub_results,2),file_name)
@@ -394,7 +323,7 @@ get_centrality_stats <- function(school_network,current_group){
   school_network  <- school_network %>%  as_tbl_graph %>% 
     tidygraph::activate(nodes) %>% 
     mutate(
-      alpha = centrality_alpha(weights = weight),
+      # alpha = centrality_alpha(weights = weight),
       authority = centrality_authority(weights = weight),
       betweenness = centrality_betweenness(weights = weight),
       eigen = centrality_eigen(weights = weight),
@@ -405,7 +334,7 @@ get_centrality_stats <- function(school_network,current_group){
     )
   
   resumen_central <- school_network %>% as_tibble()
-  file_name <- str_c("./../results/school_clusters/groups/centrality_stats/",
+  file_name <- str_c("./data/results/school_clusters/groups/centrality_stats/",
                      "group_",current_group,".csv")
   
   write.csv(resumen_central,file_name)
@@ -417,13 +346,21 @@ get_centrality_stats <- function(school_network,current_group){
 # Comparison algoritms
 #-----------------------------
 
-compare_clusering_algorithms <- function(fc, select_nodos,current_group){
+compare_clustering_algorithms <- function(fc, select_nodos,current_group){
   algorithm <- str_replace(algorithm(fc), " ", "_")
   select_nodos <- save_subgroups(fc, select_nodos,
                                  algorithm, current_group)
   
-  
-  save_map(select_nodos,algorithm, current_group)
+  #save_map(select_nodos,algorithm, current_group)
   get_stats_group(select_nodos, algorithm, current_group)
   return(get_community_stats(fc)) 
+}
+
+
+get_new_nodes <- function(algorithm, current_group){
+  algorithm <- str_replace(algorithm, " ", "_")
+  file_name <- str_c("./data/results/school_clusters/groups/select_nodos/",
+                     algorithm, "_group_",current_group,".csv")
+  new_nodos <- read.csv(file_name)
+  return(new_nodos)
 }
