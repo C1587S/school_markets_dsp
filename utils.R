@@ -97,7 +97,30 @@ calc_convexhulls <- function(df_buffers){
   return(ch_outs)
 }
 
-
+graph_mapnetworks <- function(select_nodos, select_relations) {
+  location <- data.frame("escuela"=select_nodos$name, "lat"=select_nodos$lat, "lon"=select_nodos$lon)
+  links <- data.frame("From"=select_relations$cct_o, "To"=select_relations$cct_d, "freq"=select_relations$flujo)
+  n <- graph.data.frame(links, directed=TRUE, vertices=location)
+  network <- get.data.frame(n, "both")
+  
+  vert <- network$vertices
+  coordinates(vert) <- ~ lon + lat
+  edges <- network$edges
+  edges <- lapply(1:nrow(edges), function(i){
+    as(rbind(vert[vert$name==edges[i, "from"], ],
+             vert[vert$name==edges[i, "to"], ]),
+       "SpatialLines")
+  }
+  )
+  
+  for (i in seq_along(edges)){
+    edges[[i]] <- spChFIDs(edges[[i]], as.character(i))
+  }
+  edges <- do.call(rbind, edges)
+  
+  out_graph = list("verts"=vert, "edges"=edges)
+  return(out_graph)
+}
 
 # 
 # map_buffers <- function(proj_buffers, df_buffers){
