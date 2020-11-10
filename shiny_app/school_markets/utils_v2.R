@@ -24,7 +24,7 @@ packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly',
               'htmltools', 'igraph', 'leaflet','linkcomm', 'maptools', 'mapview', 
               'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
               'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
-              'tidygraph', 'GeoRange', 'geosphere', 'igraphdata')
+              'tidygraph', 'GeoRange', 'geosphere', 'igraphdata', 'shinydashboard')
 
 lapply(packages, installations)
 
@@ -441,7 +441,7 @@ get_new_nodes <- function(algorithm, current_group){
 
 
 ########## Big function
-comp_communities <- function(buffer, nodos, df) {
+comp_communities <- function(buffer, nodos, df, algorithm) {
   current_group <- buffer
   relations <- get_relations(nodos, df)
   
@@ -458,13 +458,21 @@ comp_communities <- function(buffer, nodos, df) {
   
   get_centrality_stats(school_network, current_group)
   
+  if (algorithm=="fg"){
+    fc <- cluster_fast_greedy(school_network) 
+  } else if (algorithm=="wt"){
+    fc <- cluster_walktrap(school_network)
+  } else if (algorithm=="lp"){
+    fc <- cluster_label_prop(school_network)
+  } else if (algorithm=="le"){
+    fc <- cluster_leading_eigen(school_network)
+  }
   
-  fc <- cluster_fast_greedy(school_network)
   algorithm <- str_replace(algorithm(fc), " ", "_")
   select_nodos <- save_subgroups(fc, select_nodos,
                                  algorithm, current_group)
   
-  save_map(select_nodos,algorithm, current_group)
+  # save_map(select_nodos,algorithm, current_group)
   get_stats_group(select_nodos, algorithm, current_group)
   get_community_stats(fc) 
   
