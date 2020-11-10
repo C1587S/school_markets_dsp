@@ -24,7 +24,7 @@ packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly',
              'htmltools', 'igraph', 'leaflet','linkcomm', 'maptools', 'mapview', 
              'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
              'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
-             'tidygraph', 'GeoRange')
+             'tidygraph', 'GeoRange', 'geosphere')
 
 lapply(packages, installations)
 
@@ -97,15 +97,16 @@ calc_convexhulls <- function(df_buffers){
   return(ch_outs)
 }
 
-graph_mapnetworks <- function(select_nodos, select_relations) {
-  location <- data.frame("escuela" = select_nodos$name, 
-                         "lat" = select_nodos$lat, "lon"=select_nodos$lon)
-  
+compute_spatial_network <- function(select_nodos, select_relations) {
+  locs <- data.frame("CCT" = select_nodos$name, 
+                     "subgrupo" = select_nodos$sub_grupo,
+                     "lat" = select_nodos$lat, "lon"=select_nodos$lon)
   links <- data.frame("From" = select_relations$cct_o,
                       "To" = select_relations$cct_d, 
-                      "freq"=select_relations$flujo)
+                      "freq"=select_relations$flujo,
+                      "tot_cambian"=select_relations$total_cambian)
   
-  n <- graph.data.frame(links, directed=TRUE, vertices=location)
+  n <- graph.data.frame(links, directed=TRUE, vertices=locs)
   network <- get.data.frame(n, "both")
   
   vert <- network$vertices
@@ -123,57 +124,82 @@ graph_mapnetworks <- function(select_nodos, select_relations) {
   }
   edges <- do.call(rbind, edges)
   
-  out_graph = list("network"=network, "verts"=vert, "edges"=edges)
+  flujo <- select_relations$flujo
+  scaled_flujo <- scale(select_relations$flujo, 2, 10)
+  total <-select_relations$total_cambian
+  scaled_total <- scale(select_relations$total_cambian, 2, 10)
+  weight <- select_relations$total_cambian
+  scaled_weight <- scale(select_relations$weight, 2, 10)
+  
+  lines_sf <- st_as_sf(edges, CRS("+proj=utm +zone=51 ellps=WGS84"))
+  lines_df <- as.data.frame(lines_sf)  %>% cbind(flujo, scaled_flujo, 
+                                                 total, scaled_total, 
+                                                 weight, scaled_weight) %>% 
+    rename(lines=geometry)
+  
+  out_graph = list("network"=network, "verts"=vert, "edges"=lines_df)
   
   return(out_graph)
 }
 
-# 
-# map_buffers <- function(proj_buffers, df_buffers){
-#   m <-leaflet() %>%
-#     addProviderTiles(providers$Stamen.TonerLite,
-#                      options = providerTileOptions(noWrap = TRUE)) %>%
-#     addPolygons(data=proj_buffers, weight = 3, fillColor = "yellow") %>% 
-#     addCircleMarkers(data=df_buffers, ~longitud, ~latitud, color = "red", 
-#                     stroke = FALSE, fillOpacity = 0.5,radius=2,
-#                      label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)))
-#   # adds menu for visualization
-#   m %>% setView(0,0,3)
-#   esri <- grep("^Esri", providers, value = TRUE)
-#   for (provider in esri) {
-#     m <- m %>% addProviderTiles(provider, group = provider)
-#   }
-#   m %>%
-#     addLayersControl(baseGroups = names(esri),
-#                      options = layersControlOptions(collapsed = FALSE)) %>%
-#     addMiniMap(tiles = esri[[1]], toggleDisplay = TRUE,
-#                position = "bottomleft") %>%
-#     htmlwidgets::onRender("
-#     function(el, x) {
-#       var myMap = this;
-#       myMap.on('baselayerchange',
-#         function (e) {
-#           myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
-#         })
-#     }") %>% 
-#   clearBounds()
-#   
-# }
-
-
-map_buffers_v2 <- function(proj_buffers, df_buffers){
+map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edges_type="flujo") {
+  #school icons
+  icons <- awesomeIcons(
+    icon = "graduation-cap", library = "fa",
+    markerColor = "green")
+  # Create a categorical palette for communities along the commuting zone
+  n_sub <- vert$subgrupo %>% unique() %>% length()
+  factpal <- colorFactor(topo.colors(n_sub), vert$subgrupo)
+  
+  if (edges_type=="flujo"){
+    edges_label <- "Flujo: "
+    edges_label2 <- edges$flujo
+    edges_weight <- edges$scaled_flujo
+  } else if (edges_type=="total"){
+    edges_label <- "Cambio total: "
+    edges_label2 <- edges$total
+    edges_weight <- edges$scaled_total
+  } else if (edges_type=="peso"){
+    edges_label <- "Weight: "
+    edges_label2 <- edges$weight
+    edges_weight <- edges$scaled_weight
+  }
+  ### Map
   leaflet() %>%
-    addTiles() %>% 
-    addMarkers(data=df_buffers, ~longitud, ~latitud,
-               clusterOptions = markerClusterOptions(),
-               label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
-               icon = list(
-                 iconUrl = './data/school_icon.png',
-                 iconSize = c(60, 60))
-    ) %>% 
+    ## Schools
+    # addTiles() %>% 
+    addProviderTiles(providers$OpenStreetMap.Mapnik, group = "Map") %>% 
+    addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud, group = "Schools",
+                      clusterOptions = markerClusterOptions(),
+                      label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
+                      labelOptions = labelOptions(direction = "top", 
+                                                  textsize = "10px", textOnly = TRUE),
+                      icon=icons) %>%  
+    # convexhulls
+    addPolygons(data=ch_df$ch_polygons, group = "Convex Hulls",
+                stroke = FALSE, smoothFactor = 0.2, fillOpacity = 0.2, fillColor="red") %>% 
+    # Unions
+    addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Convex Hull Unions") %>%
+    
+    # Buffers
+    addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>% 
+    
+    # Networks
+    addPolylines(data=edges$lines, weight=edges_weight, label=paste(edges_label, edges_label2),
+                 color="grey", group = "Networks") %>%
+    addCircleMarkers(data=vert, radius = 6, weight = 6, color=~factpal(subgrupo), 
+                     stroke = TRUE, fillOpacity = 0.5,
+                     label = ~htmlEscape(paste("CCT:", vert$name, "| Subgrupo:", subgrupo)),
+                     labelOptions = labelOptions(direction = "bottom", 
+                                                 textsize = "10px", textOnly = TRUE),
+                     group = "Networks") %>% 
+    # Additionals
+    # Layers control
+    addLayersControl(
+      overlayGroups = c("Map","Schools", "Buffers", "Convex Hulls", "Convex Hull Unions", "Networks"),
+      options = layersControlOptions(collapsed = FALSE)) %>% 
     clearBounds()
 }
-
 
 #-----------------------------
 # Build graph
@@ -200,7 +226,7 @@ get_relations <- function(nodos, df) {
     na.omit()
   return(relations)
 }
-get_select_relations <- function(nodos, current_group){
+get_select_relations <- function(nodos, current_group, relations){
   select_nodos <- nodos %>% filter(grupo == current_group)
   
   # Encontrar las relaciones entre los nodos del mismo grupo
@@ -290,7 +316,7 @@ save_subgroups <- function(fc, select_nodos,algorithm,current_group){
     escuela <- select_nodos$name[i] 
     select_nodos$sub_grupo[i] <- fccommunity[escuela][[1]]
   }
-  
+
   file_name <- str_c("./data/results/school_clusters/groups/select_nodos/",
                      algorithm, "_group_",current_group,".csv")
   sub_df <- select_nodos %>% 
@@ -298,8 +324,6 @@ save_subgroups <- function(fc, select_nodos,algorithm,current_group){
   write_csv(sub_df,file_name)
   return(select_nodos)
 }
-
-
 
 #-----------------------------
 # Subgroup stats
@@ -415,6 +439,38 @@ get_new_nodes <- function(algorithm, current_group){
   return(new_nodos)
 }
 
+
+########## Big function
+comp_communities <- function(buffer, nodos, df) {
+  current_group <- buffer
+  relations <- get_relations(nodos, df)
+  
+  select_relations <- get_select_relations(nodos, current_group, relations)
+  select_nodos <- get_select_nodos(select_relations, current_group)
+  
+  school_network <- graph_from_data_frame(select_relations, directed=FALSE, vertices=select_nodos)
+  is_weighted(school_network)
+  
+  fc <- cluster_fast_greedy(school_network)
+  
+  algorithm <- str_replace(algorithm(fc), " ", "_")
+  select_nodos <- save_subgroups(fc, select_nodos, algorithm, current_group)
+  
+  get_centrality_stats(school_network, current_group)
+  
+  
+  fc <- cluster_fast_greedy(school_network)
+  algorithm <- str_replace(algorithm(fc), " ", "_")
+  select_nodos <- save_subgroups(fc, select_nodos,
+                                 algorithm, current_group)
+  
+  save_map(select_nodos,algorithm, current_group)
+  get_stats_group(select_nodos, algorithm, current_group)
+  get_community_stats(fc) 
+  
+  output <- list("selected_nodos"= select_nodos, "select_relations"=select_relations)
+  return(output)
+}
 #### Additionals
 scale <- function(x, t_min, t_max){
   r_min <- min(x)

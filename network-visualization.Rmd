@@ -37,8 +37,8 @@ proj_buffers <- buff_test$buffers_proj
 
 #### Saving the generated buffers
 ```{r}
-saveRDS(df_buffers, "./data/df_ch_df_test_15k_6km.rds")
-saveRDS(proj_buffers, "./data/proj_buffers_test_15k_6km.rds")
+saveRDS(df_buffers, "./data/df_ch_cdmx.rds")
+saveRDS(proj_buffers, "./data/proj_buffers_cdmx.rds")
 # df_buffers <-readRDS("./data/df_ch_df_test_15k_6km.rds")
 # proj_buffers <- readRDS("./data/proj_buffers_test_15k_6km.rds")
 ```
@@ -54,110 +54,7 @@ saveRDS(ch_df, "./data/df_ch_df_test_15k_6km.rds")
 unions <- st_union(ch_df$ch_polygons) %>%  st_sf()
 saveRDS(unions, "./data/df_unions_test_16k_6km.rds")
 ```
-
-
-```{r}
-path <- "./data/agregados/"
-df_sec <- read_csv(paste0(path, "agregado_dist_sec_v2.csv"))
-saveRDS(df_sec, paste0(path, "agregado_dist_sec_v2.rds"))
-# original
-df <- readRDS(paste0(path, paste0(path, "agregado_dist_sec_v2.rds")))
-
-```
-
-```{r}
-nodos <- df_buffers %>% rename(grupo=buffer)
-nodos %>% group_by(grupo) %>%  summarise(n=n()) %>% arrange(-n)
-```
-
-
-```{r}
-nodos <- df_buffers %>% rename(name=cct, lat=latitud, lon=longitud, grupo=buffer)
-df <- readRDS("./data/agregados/agregado_dist_sec_v2.rds")
-
-relations<-get_relations(nodos, df)
-select_relations <- get_select_relations(nodos, current_group)
-select_nodos <- get_select_nodos(select_relations,current_group)
-# 
-current_group <- 14
-
-select_relations <- get_select_relations(nodos, current_group)
-select_nodos <- get_select_nodos(select_relations,current_group)
-
-school_network <- graph_from_data_frame(select_relations, directed=FALSE, vertices=select_nodos)
-is_weighted(school_network)
-
-fc <- cluster_fast_greedy(school_network)
-algorithm <- str_replace(algorithm(fc), " ", "_")
-select_nodos <- save_subgroups(fc, select_nodos, algorithm, current_group)
-
-get_centrality_stats(school_network, current_group)
-
-
-fc <- cluster_fast_greedy(school_network)
-algorithm <- str_replace(algorithm(fc), " ", "_")
-select_nodos <- save_subgroups(fc, select_nodos,
-                               algorithm, current_group)
-
-save_map(select_nodos,algorithm, current_group)
-get_stats_group(select_nodos, algorithm, current_group)
-get_community_stats(fc) 
-```
-
-```{r}
-test <- graph_mapnetworks(select_nodos, select_relations)
-vert <- test$verts
-edges <- test$edges
-network <- test$network
-```
-
-
-
 #### Big map with layers
-```{r}
-# df_buffers <- df_buffers %>%  mutate(estado=substr(cct, 1, 2))
-# df_buffers
-```
-
-```{r}
-#school icons
-icons <- awesomeIcons(
-  icon = "graduation-cap", library = "fa",
-  markerColor = "green"
-)
-
-
-  leaflet() %>%
-  # Schools
-    addTiles() %>% 
-    addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud,group = "Schools",
-                     clusterOptions = markerClusterOptions(),
-                     label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
-                     icon=icons
-                )  %>% 
-  # convexhulls
-  addPolygons(data=ch_df$ch_polygons, group = "Convex Hulls",
-              stroke = FALSE, smoothFactor = 0.2, fillOpacity = 0.2, fillColor="red") %>% 
-  # Buffers
-  addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>%
-  # Unions
-  addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Convex Hull Unions") %>% 
-  # networks
-  addCircles(data=vert, radius=3, weight = 3, color="black", group = "Networks") %>%
-    addPolylines(data=edges, weight = 1*network$edges$freq, color="black", group = "Networks") %>%
-  # Additionals
-    # Layers control
-    addLayersControl(
-    # baseGroups = c("OSM (default)", "Toner", "Toner Lite"),
-    overlayGroups = c("Schools", "Buffers", "Convex Hulls", "Convex Hull Unions", "Networks"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) %>% 
-  clearBounds()
-```
-
-
-
-
 
 ###### Mocking data exercise - Restricting just to df schools
 ```{r}
@@ -165,15 +62,17 @@ source('utils.R')
 library(tidygraph)
 library(ggraph)
 library(igraphdata)
-db <- readRDS("./data/master_db_filtered.rds")
-db <- db %>% mutate(estado=substr(cct,1,2)) %>% filter(estado=="09")
-db <- sample_n(db, 1000)
-db$latitud <- as.numeric(db$latitud)
-db$longitud <- as.numeric(db$longitud)
-# generating buffers
-buff_test <- calc_buffers(db, 3000)
-df_buffers <- buff_test$df_buffers
-proj_buffers <- buff_test$buffers_proj
+# db <- readRDS("./data/master_db_filtered.rds")
+# db <- db %>% mutate(estado=substr(cct,1,2)) %>% filter(estado=="09")
+# db <- sample_n(db, 1000)
+# db$latitud <- as.numeric(db$latitud)
+# db$longitud <- as.numeric(db$longitud)
+# # generating buffers
+# buff_test <- calc_buffers(db, 3000)
+# df_buffers <- buff_test$df_buffers
+# proj_buffers <- buff_test$buffers_proj
+df_buffers <- readRDS("./data/df_buffers_cdmx.rds")
+proj_buffers <- readRDS("./data/proj_buffers_cdmx.rds")
 # calculate convex hulls
 ch_df <- calc_convexhulls(df_buffers)
 # unions
@@ -182,159 +81,26 @@ unions <- st_union(ch_df$ch_polygons) %>%  st_sf()
 
 ```{r}
 path <- "./data/agregados/"
-list.files(path)
 df <- readRDS(paste0(path, "agregado_dist_sec_v2.rds"))
 nodos <- df_buffers %>% rename(grupo=buffer, name=cct, lat=latitud, lon=longitud)
-nodos %>% group_by(grupo) %>%  summarise(n=n(), `.groups`="drop") %>% arrange(-n)
+# nodos %>% group_by(grupo) %>%  summarise(n=n(), `.groups`="drop") %>% arrange(-n)
 ```
 
 ```{r}
-nodos
+selected_list <- comp_communities(buffer=1, nodos, df) 
+select_nodos <- selected_list$selected_nodos
+select_relations <- selected_list$select_relations
+# elements for spatial network
+sp_network <- compute_spatial_network(select_nodos, select_relations)
+network <- sp_network$network
+vert <- sp_network$verts
+edges <- sp_network$edges
 ```
 
+# Map in lealeft
 ```{r}
-current_group <- 1
-relations<-get_relations(nodos, df)
-
-select_relations <- get_select_relations(nodos, current_group)
-select_nodos <- get_select_nodos(select_relations,current_group)
-
-school_network <- graph_from_data_frame(select_relations, directed=FALSE, vertices=select_nodos)
-is_weighted(school_network)
-
-fc <- cluster_fast_greedy(school_network)
-algorithm <- str_replace(algorithm(fc), " ", "_")
-select_nodos <- save_subgroups(fc, select_nodos, algorithm, current_group)
-
-get_centrality_stats(school_network, current_group)
-
-
-fc <- cluster_fast_greedy(school_network)
-algorithm <- str_replace(algorithm(fc), " ", "_")
-select_nodos <- save_subgroups(fc, select_nodos,
-                               algorithm, current_group)
-
-save_map(select_nodos,algorithm, current_group)
-# get_stats_group(select_nodos, algorithm, current_group)
-get_community_stats(fc) 
-
-school_network
-```
-
-```{r}
-  location <- data.frame("escuela" = select_nodos$name, 
-                         "lat" = select_nodos$lat, "lon"=select_nodos$lon)
-
-  links <- data.frame("From" = select_relations$cct_o,
-                      "To" = select_relations$cct_d, 
-                      "freq"=select_relations$flujo)
-  
-  n <- graph.data.frame(links, directed=TRUE, vertices=location)
-  network <- get.data.frame(n, "both")
-
-  vert <- network$vertices
-  coordinates(vert) <- ~ lon + lat
-  edges <- network$edges
-  edges <- lapply(1:nrow(edges), function(i){
-    as(rbind(vert[vert$name==edges[i, "from"], ],
-             vert[vert$name==edges[i, "to"], ]),
-       "SpatialLines")
-  }
-  )
-  
-  for (i in seq_along(edges)){
-    edges[[i]] <- spChFIDs(edges[[i]], as.character(i))
-  }
-  edges <- do.call(rbind, edges)
-  
-  out_graph = list("network"=network, "verts"=vert, "edges"=edges)
-```
-
-```{r}
-test <- graph_mapnetworks(select_nodos, select_relations)
-vert <- test$verts
-edges <- test$edges
-network <- network
-
-test$
-```
-
-```{r}
-#school icons
-icons <- awesomeIcons(
-  icon = "graduation-cap", library = "fa",
-  markerColor = "green")
-
-
-leaflet() %>%
-  # Schools
-  addTiles() %>% 
-  addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud,group = "Schools",
-                     clusterOptions = markerClusterOptions(),
-                     label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
-                     icon=icons) %>%  
-  # convexhulls
-  addPolygons(data=ch_df$ch_polygons, group = "Convex Hulls",
-              stroke = FALSE, smoothFactor = 0.2, fillOpacity = 0.2, fillColor="red") %>% 
-  # Unions
-  addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Convex Hull Unions") %>%
-  
-  # Buffers
-  addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>% 
-  
-  # Networks
-  addCircles(data=vert, radius=3, weight = 3, color="black", group = "Networks") %>%
-  addPolylines(data=edges, weight = 1*network$edges$freq, color="black",
-               # label = ~htmlEscape(paste("Flujo:", network$edges$freq)),
-               group = "Networks") %>%
-  # Additionals
-    # Layers control
-    addLayersControl(
-    # baseGroups = c("OSM (default)", "Toner", "Toner Lite"),
-    overlayGroups = c("Schools", "Buffers", "Convex Hulls", "Convex Hull Unions", "Networks"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) %>% 
-  
-  clearBounds()
-
-
+map_layers(vert, df_buffers, ch_df, unions, proj_buffers, edges, edges_type="flujo")
 ```
 
 
 
-```{r}
-#school icons
-icons <- awesomeIcons(
-  icon = "graduation-cap", library = "fa",
-  markerColor = "green"
-)
-
-
-  leaflet() %>%
-  # Schools
-    addTiles() %>% 
-    addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud,group = "Schools",
-                     clusterOptions = markerClusterOptions(),
-                     label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
-                     icon=icons
-                )  %>% 
-  # convexhulls
-  addPolygons(data=ch_df$ch_polygons, group = "Convex Hulls",
-              stroke = FALSE, smoothFactor = 0.2, fillOpacity = 0.2, fillColor="red") %>% 
-  # Buffers
-  addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>%
-  # Unions
-  addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Convex Hull Unions") %>% 
-  # networks
-  # addCircles(data=vert, radius=3, weight = 3, color="black", group = "Networks") %>%
-  #   addPolylines(data=edges, weight = 1*network$edges$freq, color="black", group = "Networks") %>%
-  # Additionals
-    # Layers control
-    addLayersControl(
-    # baseGroups = c("OSM (default)", "Toner", "Toner Lite"),
-    overlayGroups = c("Schools", "Buffers", "Convex Hulls", "Convex Hull Unions"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) %>% 
-  clearBounds()
-
-```
