@@ -24,7 +24,7 @@ packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly',
              'htmltools', 'igraph', 'leaflet','linkcomm', 'maptools', 'mapview', 
              'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
              'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
-             'tidygraph')
+             'tidygraph', 'GeoRange')
 
 lapply(packages, installations)
 
@@ -174,8 +174,8 @@ map_buffers_v2 <- function(proj_buffers, df_buffers){
 #-----------------------------
 get_relations <- function(nodos, df) {
   relations <- df %>%
-    filter(distancia<30) %>%
-    filter(numDest >1) %>% 
+    # filter(distancia<30) %>%
+    # filter(numDest >1) %>% 
     mutate(proporcion = numDest/numSalen) %>%  # Tipo page-rank. numSalen 
     mutate(cct_d_u = ifelse(cct_d < cct_o, cct_d, cct_o)) %>%
     mutate(cct_o_u = ifelse(cct_d < cct_o, cct_o, cct_d)) %>%
@@ -194,7 +194,31 @@ get_relations <- function(nodos, df) {
     na.omit()
   return(relations)
 }
-
+get_select_relations <- function(nodos, current_group){
+  select_nodos <- nodos %>% filter(grupo == current_group)
+  
+  # Encontrar las relaciones entre los nodos del mismo grupo
+  select_relations_o <- relations %>% rename(name = cct_o) %>% 
+    inner_join(select_nodos, by = c("name")) %>% 
+    rename(cct_o = name)
+  
+  select_relations_od <- select_relations_o  %>% rename(name = cct_d) %>% 
+    inner_join(select_nodos, by = c("name")) %>% 
+    rename(cct_d = name) 
+  
+  select_relations_d <- relations  %>% rename(name = cct_d) %>% 
+    inner_join(select_nodos, by = c("name")) %>% 
+    rename(cct_d = name)
+  
+  select_relations_do <- select_relations_d  %>% rename(name = cct_o) %>% 
+    inner_join(select_nodos, by = c("name")) %>% 
+    rename(cct_o = name) 
+  
+  select_relations <- rbind(select_relations_do, select_relations_od) %>% 
+    distinct(cct_o, cct_d, .keep_all = TRUE)
+  
+  return(select_relations)
+}
 get_select_nodos <- function(select_relations,current_group){
   # Crear nodos 
   u_cct_o <-select_relations%>% distinct(cct_o, .keep_all = TRUE) %>% 
@@ -330,7 +354,7 @@ get_stats_group <- function(select_nodos, algorithm, current_group) {
   }
   
   sub_results <- sub_results %>% filter(priv != -1)
-  file_name <- str_c("./../../results/school_clusters/groups/group_stats/",
+  file_name <- str_c("./data/results/school_clusters/groups/group_stats/",
                      algorithm, "_group_",current_group,".csv")
   
   write.csv(round(sub_results,2),file_name)
@@ -378,7 +402,6 @@ compare_clustering_algorithms <- function(fc, select_nodos,current_group){
   get_stats_group(select_nodos, algorithm, current_group)
   return(get_community_stats(fc)) 
 }
-
 
 get_new_nodes <- function(algorithm, current_group){
   algorithm <- str_replace(algorithm, " ", "_")
