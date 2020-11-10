@@ -98,8 +98,13 @@ calc_convexhulls <- function(df_buffers){
 }
 
 graph_mapnetworks <- function(select_nodos, select_relations) {
-  location <- data.frame("escuela"=select_nodos$name, "lat"=select_nodos$lat, "lon"=select_nodos$lon)
-  links <- data.frame("From"=select_relations$cct_o, "To"=select_relations$cct_d, "freq"=select_relations$flujo)
+  location <- data.frame("escuela" = select_nodos$name, 
+                         "lat" = select_nodos$lat, "lon"=select_nodos$lon)
+  
+  links <- data.frame("From" = select_relations$cct_o,
+                      "To" = select_relations$cct_d, 
+                      "freq"=select_relations$flujo)
+  
   n <- graph.data.frame(links, directed=TRUE, vertices=location)
   network <- get.data.frame(n, "both")
   
@@ -118,7 +123,8 @@ graph_mapnetworks <- function(select_nodos, select_relations) {
   }
   edges <- do.call(rbind, edges)
   
-  out_graph = list("verts"=vert, "edges"=edges)
+  out_graph = list("network"=network, "verts"=vert, "edges"=edges)
+  
   return(out_graph)
 }
 
@@ -234,8 +240,6 @@ get_select_nodos <- function(select_relations,current_group){
   select_nodos$grupo <- current_group 
   return(select_nodos)
 }
-
-
 
 #-----------------------------
 # Community Functions
@@ -409,4 +413,13 @@ get_new_nodes <- function(algorithm, current_group){
                      algorithm, "_group_",current_group,".csv")
   new_nodos <- read.csv(file_name)
   return(new_nodos)
+}
+
+#### Additionals
+scale <- function(x, t_min, t_max){
+  r_min <- min(x)
+  r_max <- max(x)
+  z <-(t_max-t_min)/(r_max-r_min)
+  x_scaled <- (x-r_min)*z + t_min
+  return(x_scaled)
 }
