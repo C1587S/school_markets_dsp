@@ -20,11 +20,11 @@ installations <- function(paquete) {
 }
 
 packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly', 
-             'foreign', 'GISTools', 'ggraph', 'ggmap','glmnet', 'haven', 'htmlwidgets',
-             'htmltools', 'igraph', 'leaflet','linkcomm', 'maptools', 'mapview', 
-             'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
-             'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
-             'tidygraph', 'GeoRange', 'geosphere', 'igraphdata')
+              'foreign', 'GISTools', 'ggraph', 'ggmap','glmnet', 'haven', 'htmlwidgets',
+              'htmltools', 'igraph', 'leaflet','linkcomm', 'maptools', 'mapview', 
+              'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
+              'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
+              'tidygraph', 'GeoRange', 'geosphere', 'igraphdata')
 
 lapply(packages, installations)
 
@@ -302,7 +302,7 @@ save_map <- function(select_nodos,algorithm, current_group,num_plot=10){
               size = I(1), 
               mapcolor = "bw")
   
-  file_name <- str_c("./data/results/school_clusters/maps/",
+  file_name <- str_c("../../data/results/school_clusters/maps/",
                      algorithm, "_group_",current_group,".png")
   ggsave(filename = file_name, g)
 }
@@ -316,8 +316,8 @@ save_subgroups <- function(fc, select_nodos,algorithm,current_group){
     escuela <- select_nodos$name[i] 
     select_nodos$sub_grupo[i] <- fccommunity[escuela][[1]]
   }
-
-  file_name <- str_c("./data/results/school_clusters/groups/select_nodos/",
+  
+  file_name <- str_c("../../data/results/school_clusters/groups/select_nodos/",
                      algorithm, "_group_",current_group,".csv")
   sub_df <- select_nodos %>% 
     dplyr::select(name, grupo, sub_grupo)
@@ -382,7 +382,7 @@ get_stats_group <- function(select_nodos, algorithm, current_group) {
   }
   
   sub_results <- sub_results %>% filter(priv != -1)
-  file_name <- str_c("./data/results/school_clusters/groups/group_stats/",
+  file_name <- str_c("../../data/results/school_clusters/groups/group_stats/",
                      algorithm, "_group_",current_group,".csv")
   
   write.csv(round(sub_results,2),file_name)
@@ -409,7 +409,7 @@ get_centrality_stats <- function(school_network,current_group){
     )
   
   resumen_central <- school_network %>% as_tibble()
-  file_name <- str_c("./data/results/school_clusters/groups/centrality_stats/",
+  file_name <- str_c("../../data/results/school_clusters/groups/centrality_stats/",
                      "group_",current_group,".csv")
   
   write.csv(resumen_central,file_name)
@@ -433,7 +433,7 @@ compare_clustering_algorithms <- function(fc, select_nodos,current_group){
 
 get_new_nodes <- function(algorithm, current_group){
   algorithm <- str_replace(algorithm, " ", "_")
-  file_name <- str_c("./data/results/school_clusters/groups/select_nodos/",
+  file_name <- str_c("../../data/results/school_clusters/groups/select_nodos/",
                      algorithm, "_group_",current_group,".csv")
   new_nodos <- read.csv(file_name)
   return(new_nodos)
