@@ -40,9 +40,9 @@ ui <- dashboardPage(
   dashboardSidebar(
     width = 180,
     sidebarMenu(
-      menuItem("Information", tabName = "tab_info", icon = icon("info-circle")),
-      menuItem("Map explorer", tabName = "tab_map", icon = icon("map-marked-alt")),
-      menuItem("Markets analysis", tabName = "tab_tbl", icon = icon("table"))
+      menuItem("Información", tabName = "tab_info", icon = icon("info-circle")),
+      menuItem("Mapa de exploración", tabName = "tab_map", icon = icon("map-marked-alt")),
+      menuItem("Estadísticas de comunidades", tabName = "tab_tbl", icon = icon("table"))
     )
   ),
   
@@ -79,7 +79,7 @@ ui <- dashboardPage(
                            # Select commuting zone
                            selectInput("cz_id", "Zona de desplazamiento", buffers_list),
                            # Select algorithm for create communities
-                           selectInput("net_alg", "Algoritmo para comunidades",
+                           selectInput("net_alg", "Algoritmo de redes",
                                        choices = c("Fast greedy" = "fg",
                                                     "Walktrap" = "wt", 
                                                     "Leading Eigen" = "le", 
@@ -110,12 +110,16 @@ server <- function(input, output) {
   histdata <- rnorm(500)
   
   output$map <- renderLeaflet({
+    # commuting zone number
+    cz_id <- input$cz_id
     # compute graph network
     algo <- input$net_alg # selected algorithm
-    
-    selected_list <- comp_communities(buffer=1, nodos, df, algorithm=algo) 
+    ## compute communities
+    selected_list <- comp_communities(buffer=cz_id, nodos, df, algorithm=algo) 
     select_nodos <- selected_list$selected_nodos
     select_relations <- selected_list$select_relations
+    
+    
     # elements for spatial network
     sp_network <- compute_spatial_network(select_nodos, select_relations)
     network <- sp_network$network
