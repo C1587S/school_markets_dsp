@@ -15,20 +15,8 @@ nodos <- df_buffers %>% rename(grupo=buffer, name=cct, lat=latitud, lon=longitud
 
 # number of available buffers
 buffers_list <- df_buffers$buffer %>% unique() %>% as.vector()
-# map layers
-map_layers <- c(
-  "Mapa",
-  "Escuelas",
-  "Buffers",
-  "Envolventes convexas",
-  "Mercados educativos"
-)
-# algorithms for computing communities
-comm_algorithms <-c("Fast greedy", "Walktrap", "Leading Eigen", "Label Prop")
-# fg, wt, le, lp
 
 ### App
-
 ui <- dashboardPage(
   skin = "green",
   dashboardHeader(
@@ -42,7 +30,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Información", tabName = "tab_info", icon = icon("info-circle")),
       menuItem("Mapa de exploración", tabName = "tab_map", icon = icon("map-marked-alt")),
-      menuItem("Estadísticas de comunidades", tabName = "tab_tbl", icon = icon("table"))
+      menuItem("Estadísticas", tabName = "tab_tbl", icon = icon("table"))
     )
   ),
   
@@ -56,24 +44,33 @@ ui <- dashboardPage(
         font-size: 24px;
       }
     '))), 
-    tabItems(
-      ##### First tab content
-      tabItem(tabName = "tab_info",
-              h2("Visualización y Análisis de Mercados Educativos en México")
-      ),
-      
-      ##### Second tab content (map explorer)
+      ##### First tab content (map explorer)
       tabItem(tabName = "tab_map",
               h2("Mapa de Mercados Educativos en México"),
               fluidRow(
                 column(width = 9,
+                       # Map
                        box(width = NULL, solidHeader = TRUE,
                            leafletOutput("map", height = 500)
                            ),
+                       # Box with algo stats
+                       box(width = NULL, status = "warning",
+                           solidHeader=T,
+                           # title="Métricas del algoritmo",
+                           tableOutput("algo_stats")
+                       ),
+                       # Box with group stats
+                       box(width = NULL, status = "warning",
+                           solidHeader=T,collapsible=T,collapsed = T,
+                           title="Estadísticas de mercados",
+                           tableOutput("community_stats")
+                       ) 
+                    
                        ),
                 column(width = 3,
                        # Buffer size
-                       box(width = NULL, status = "danger",
+                       box(width = NULL,collapsible=T, collapsed=T, status = "danger",solidHeader=T,
+                           title="Opciones",
                            selectInput("buff_size", "Radio de los buffers", 
                                        c("5 kms", "10 kms", "15 kms")),
                            # Select commuting zone
@@ -83,22 +80,41 @@ ui <- dashboardPage(
                                        choices = c("Fast greedy" = "fg",
                                                     "Walktrap" = "wt", 
                                                     "Leading Eigen" = "le", 
-                                                    "Label Prop" = "lp"))
+                                                    "Label Prop" = "lp",
+                                                    "Multi-level" = 'cl')),
+                            # Select edges type
+                            selectInput("edges_type", "Tipo de aristas",
+                                        choices = c("Flujo" = "flujo",
+                                                     "Total" = "total", 
+                                                     "Peso" = "peso")),
+                           # Select color for edges
+                           selectInput("edges_color", "Color de las aristas",
+                                       choices = c("Gris" = "grey",
+                                                   "Negro" = "black", 
+                                                   "Rojo" = "red"))
                                        ),
-                       # Menu with map layers
-                       box(width = NULL, status = "danger",
-                           checkboxGroupInput("map_elements", "Elementos en el mapa",
-                                              choices = map_layers,
-                                              selected = map_layers)
+                           # Box with group members
+                          box(width = NULL, status = "info",
+                              solidHeader=T,collapsible=T,
+                              title="Miembros de los mercados",
+                              tableOutput("mkt_members_tbl")
                            )
+                          
                       )
                       )
       ),
-      ##### Third tab content (data analysis)
+      ##### Second tab content (data analysis)
       tabItem(tabName = "tab_tbl",
-              h2("Data Analysis for School Markets")
+              h2("")
+      ),
+      # fluidRow()
+      tabItems(
+      ##### First tab content
+            tabItem(tabName = "tab_info",
+            h2("")
+                        
+            )
       )
-    )
   )
   
   
@@ -106,28 +122,60 @@ ui <- dashboardPage(
 )
 
 server <- function(input, output) {
-  set.seed(122)
-  histdata <- rnorm(500)
-  
-  output$map <- renderLeaflet({
-    # commuting zone number
-    cz_id <- input$cz_id
-    # compute graph network
-    algo <- input$net_alg # selected algorithm
-    ## compute communities
-    selected_list <- comp_communities(buffer=cz_id, nodos, df, algorithm=algo) 
-    select_nodos <- selected_list$selected_nodos
-    select_relations <- selected_list$select_relations
-    
-    
-    # elements for spatial network
-    sp_network <- compute_spatial_network(select_nodos, select_relations)
-    network <- sp_network$network
-    vert <- sp_network$verts
-    edges <- sp_network$edges
-    
-    map_layers(vert, df_buffers, ch_df, unions, proj_buffers, edges, edges_type="flujo")
+  set.seed(202011)
+  values <- reactiveValues()
+  observe({
+    values$cz_id <-  input$cz_id
+    values$algo  <-  input$net_alg
+    values$selected_list <- comp_communities(buffer=values$cz_id, nodos, df, algorithm=values$algo)
+    values$sp_network <- compute_spatial_network(values$selected_list$selected_nodos, 
+                                          values$selected_list$select_relations)
+    values$network <- values$sp_network$network
+    values$vert <- values$sp_network$verts
+    values$edges <- values$sp_network$edges
+    values$edges_plot <- input$edges_type
+    values$edges_color <- input$edges_color
   })
+  #### Map
+  output$map <- renderLeaflet({
+    # elements for spatial network
+    map_layers(values$vert, df_buffers, ch_df, unions, proj_buffers, values$edges,
+               edges_type=values$edges_plot, edges_color=values$edges_color)
+  })
+  
+  #### Markets schools
+  output$mkt_members_tbl <-  function() {
+    values$selected_list$mem_list %>%  
+      kbl() %>%
+      kable_minimal(full_width = F, position = "left") %>% 
+      kable_styling(font_size = 8) %>% 
+      scroll_box(width = "230px", height = "520px")
+  }
+  #### Community Stats
+  output$community_stats <- function(){
+    legends <- c("N: Nro. de escuelas;",
+                 "DistMed: Distancia media (kms);", 
+                 "MaxDist: Máxima distancia (kms);",
+                 "MinDist: Mínima distancia (kms);",
+                 "MedDist: Distancia media (kms);",
+                 "Area: Area de Envolvente convexa (kms2);",
+                 "Privs: Porcentaje de escuelas privadas (%).")
+    
+    values$selected_list$com_stats %>% 
+      mutate(N = color_bar("lightgreen")(N)) %>% 
+      kable("html", escape = F) %>%
+      kable_styling("hover", full_width = F) %>%
+      column_spec(1, width = "3cm") %>%
+      footnote(number = c(legends))
+  }
+  #### Algoritmh Stats
+  output$algo_stats <- function(){
+    values$selected_list$algo_stats %>% 
+      kable("html") %>% 
+    kable_styling("hover", full_width = F) %>% 
+      scroll_box(height = "70px")
+  }
+  
 }
 
 shinyApp(ui, server)

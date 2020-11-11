@@ -24,7 +24,8 @@ packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly',
               'htmltools', 'igraph', 'leaflet','linkcomm', 'maptools', 'mapview', 
               'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
               'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
-              'tidygraph', 'GeoRange', 'geosphere', 'igraphdata', 'shinydashboard')
+              'tidygraph', 'GeoRange', 'geosphere', 'igraphdata', 'shinydashboard',
+              'leaflet.extras', 'kableExtra', 'formattable', 'DT')
 
 lapply(packages, installations)
 
@@ -142,7 +143,7 @@ compute_spatial_network <- function(select_nodos, select_relations) {
   return(out_graph)
 }
 
-map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edges_type="flujo") {
+map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edges_type="flujo", edges_color) {
   #school icons
   icons <- awesomeIcons(
     icon = "graduation-cap", library = "fa",
@@ -186,7 +187,7 @@ map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edg
     
     # Networks
     addPolylines(data=edges$lines, weight=edges_weight, label=paste(edges_label, edges_label2),
-                 color="grey", group = "Networks") %>%
+                 color=edges_color, group = "Networks") %>%
     addCircleMarkers(data=vert, radius = 6, weight = 6, color=~factpal(subgrupo), 
                      stroke = TRUE, fillOpacity = 0.5,
                      label = ~htmlEscape(paste("CCT:", vert$name, "| Subgrupo:", subgrupo)),
@@ -197,7 +198,8 @@ map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edg
     # Layers control
     addLayersControl(
       overlayGroups = c("Map","Schools", "Buffers", "Convex Hulls", "Convex Hull Unions", "Networks"),
-      options = layersControlOptions(collapsed = FALSE)) %>% 
+      options = layersControlOptions(collapsed = TRUE)) %>% 
+    hideGroup(c("Schools", "Buffers", "Convex Hulls", "Convex Hull Unions")) %>% 
     clearBounds()
 }
 
@@ -363,7 +365,8 @@ get_stats_sub_group <- function(current_sub_group, select_nodos){
 #-----------------------------
 # Subgroup stats
 #-----------------------------
-get_stats_group <- function(select_nodos, algorithm, current_group) {
+get_stats_group <- function(select_nodos, current_group) {
+  # algorithm
   sub_results <- data.frame(group = -1,
                             mean_dist = -1,
                             max_dist = -1,
@@ -381,11 +384,13 @@ get_stats_group <- function(select_nodos, algorithm, current_group) {
     sub_results <- rbind(sub_results, r)
   }
   
-  sub_results <- sub_results %>% filter(priv != -1)
-  file_name <- str_c("../../data/results/school_clusters/groups/group_stats/",
-                     algorithm, "_group_",current_group,".csv")
+  # sub_results <- sub_results %>% filter(priv != -1)
+  # file_name <- str_c("../../data/results/school_clusters/groups/group_stats/",
+  #                    algorithm, "_group_",current_group,".csv")
+  # 
+  # write.csv(round(sub_results,2),file_name)
   
-  write.csv(round(sub_results,2),file_name)
+  return(sub_results)
   
 }
 
@@ -413,7 +418,7 @@ get_centrality_stats <- function(school_network,current_group){
                      "group_",current_group,".csv")
   
   write.csv(resumen_central,file_name)
-  
+  return(resumen_central)
   
 }
 
@@ -421,7 +426,7 @@ get_centrality_stats <- function(school_network,current_group){
 # Comparison algoritms
 #-----------------------------
 
-compare_clustering_algorithms <- function(fc, select_nodos,current_group){
+compare_clustering_algorithms <- function(fc, select_nodos, current_group){
   algorithm <- str_replace(algorithm(fc), " ", "_")
   select_nodos <- save_subgroups(fc, select_nodos,
                                  algorithm, current_group)
@@ -449,36 +454,71 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
   select_nodos <- get_select_nodos(select_relations, current_group)
   
   school_network <- graph_from_data_frame(select_relations, directed=FALSE, vertices=select_nodos)
-  is_weighted(school_network)
-  
-  fc <- cluster_fast_greedy(school_network)
-  
-  algorithm <- str_replace(algorithm(fc), " ", "_")
-  select_nodos <- save_subgroups(fc, select_nodos, algorithm, current_group)
   
   get_centrality_stats(school_network, current_group)
   
   if (algorithm=="fg"){
-    fc <- cluster_fast_greedy(school_network) 
+    fc <<- cluster_fast_greedy(school_network) 
   } else if (algorithm=="wt"){
-    fc <- cluster_walktrap(school_network)
+    fc <<- cluster_walktrap(school_network)
   } else if (algorithm=="lp"){
-    fc <- cluster_label_prop(school_network)
+    fc <<- cluster_label_prop(school_network)
   } else if (algorithm=="le"){
-    fc <- cluster_leading_eigen(school_network)
+    fc <<- cluster_leading_eigen(school_network)
+  } else if (algorithm=="cl"){
+    fc <<- cluster_louvain(school_network)
   }
   
   algorithm <- str_replace(algorithm(fc), " ", "_")
   select_nodos <- save_subgroups(fc, select_nodos,
                                  algorithm, current_group)
+  # tables with community members
+  mrkt_members_tbl <- tbls_mrkt_members(select_nodos, current_group)
   
-  # save_map(select_nodos,algorithm, current_group)
-  get_stats_group(select_nodos, algorithm, current_group)
-  get_community_stats(fc) 
-  
-  output <- list("selected_nodos"= select_nodos, "select_relations"=select_relations)
-  return(output)
+  output <- list("mem_list"=mrkt_members_tbl$miembros,
+                 "com_stats"=mrkt_members_tbl$com_stats,
+                 "algo_stats"=mrkt_members_tbl$algo_stas,
+                 "selected_nodos"= select_nodos, 
+                 "select_relations"=select_relations)
 }
+###############
+## tables for shiny
+tbls_mrkt_members <- function(select_nodos, current_group) {
+  # School of each market
+  tbl_miembros <- select_nodos %>% rename(CCT=name, Latitud=lat, Longitud=lon, Mercado=sub_grupo) %>% 
+    arrange(Mercado) %>% 
+    mutate_at(vars(Mercado), funs(factor))
+  tbl_miembros <- tbl_miembros[c("CCT", "Mercado", "Latitud", "Longitud" )]
+  # community stats
+  com_stats <- get_stats_group(select_nodos, current_group)%>% 
+    filter(group>0) %>% 
+    mutate_at(vars(group), funs(factor)) %>% 
+    rename(Mercado=group, DistMed=mean_dist, MaxDist=max_dist, MinDist=min_dist,
+           MedDist=median_dist, Area=convex_hull, N=num_elem_subgroup, Privs=priv) %>% 
+    select(Mercado, N, everything()) %>% arrange(-N) %>% round_df(4)
+  # algorithm stats
+  algo_tbl <- get_community_stats(fc) %>% rename(Algoritmo=algoritm, 
+                                                 Modularidad=modularity,
+                                                 Mercados=num_groups,
+                                                 Media=mean_size,
+                                                 Mediana=median_size,
+                                                 Max=max_size,
+                                                 Min=min_size) %>% round_df(2)
+  
+  out <- list("miembros"=tbl_miembros, "com_stats"=com_stats, "algo_stas"=algo_tbl)
+  return(out)
+}
+
+comm_stats_rep <- function(fc) {
+  tbl_mrkt_grl <- get_community_stats(fc)
+  tbl_mrkt_grl <- tbl_mrkt_grl %>% 
+    rename(Algoritmo=algoritm, Modularidad=modularity, `Nro. Mercados`=num_groups,
+           `Tamaño promedio`=mean_size, `Mediana del tamaño`=median_size, 
+           `Mayor tamaño`=max_size, `Menor Tamaño`=min_size) %>% 
+    round_df(digits=2)
+  return(tbl_mrkt_grl)
+}
+
 #### Additionals
 scale <- function(x, t_min, t_max){
   r_min <- min(x)
@@ -486,4 +526,12 @@ scale <- function(x, t_min, t_max){
   z <-(t_max-t_min)/(r_max-r_min)
   x_scaled <- (x-r_min)*z + t_min
   return(x_scaled)
+}
+
+round_df <- function(df, digits) {
+  # taken from: 
+  # https://stackoverflow.com/questions/9063889/how-to-round-a-data-frame-in-r-that-contains-some-character-variables
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+  df[,nums] <- round(df[,nums], digits = digits)
+  (df)
 }
