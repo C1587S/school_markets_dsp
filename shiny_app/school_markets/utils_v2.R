@@ -25,7 +25,7 @@ packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly',
               'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
               'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
               'tidygraph', 'GeoRange', 'geosphere', 'igraphdata', 'shinydashboard',
-              'leaflet.extras', 'kableExtra', 'formattable', 'DT')
+              'leaflet.extras', 'kableExtra', 'formattable', 'shinydashboard')
 
 lapply(packages, installations)
 
@@ -169,25 +169,25 @@ map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edg
   leaflet() %>%
     ## Schools
     # addTiles() %>% 
-    addProviderTiles(providers$OpenStreetMap.Mapnik, group = "Map") %>% 
-    addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud, group = "Schools",
+    addProviderTiles(providers$OpenStreetMap.Mapnik, group = "Mapa") %>% 
+    addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud, group = "Escuelas",
                       clusterOptions = markerClusterOptions(),
                       label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
                       labelOptions = labelOptions(direction = "top", 
                                                   textsize = "10px", textOnly = TRUE),
                       icon=icons) %>%  
     # convexhulls
-    addPolygons(data=ch_df$ch_polygons, group = "Convex Hulls",
+    addPolygons(data=ch_df$ch_polygons, group = "Envolventes convexas",
                 stroke = FALSE, smoothFactor = 0.2, fillOpacity = 0.2, fillColor="red") %>% 
     # Unions
-    addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Convex Hull Unions") %>%
+    addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Uniones de envolventes convexas") %>%
     
     # Buffers
     addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>% 
     
     # Networks
     addPolylines(data=edges$lines, weight=edges_weight, label=paste(edges_label, edges_label2),
-                 color=edges_color, group = "Networks") %>%
+                 color=edges_color, group = "Redes") %>%
     addCircleMarkers(data=vert, radius = 6, weight = 6, color=~factpal(subgrupo), 
                      stroke = TRUE, fillOpacity = 0.5,
                      label = ~htmlEscape(paste("CCT:", vert$name, "| Subgrupo:", subgrupo)),
@@ -197,9 +197,9 @@ map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edg
     # Additionals
     # Layers control
     addLayersControl(
-      overlayGroups = c("Map","Schools", "Buffers", "Convex Hulls", "Convex Hull Unions", "Networks"),
+      overlayGroups = c("Mapa","Escuelas", "Buffers", "Envolventes convexas", "Uniones de envolventes convexas", "Redes"),
       options = layersControlOptions(collapsed = TRUE)) %>% 
-    hideGroup(c("Schools", "Buffers", "Convex Hulls", "Convex Hull Unions")) %>% 
+    hideGroup(c("Escuelas", "Buffers", "Envolventes convexas", "Uniones de envolventes convexas")) %>% 
     clearBounds()
 }
 
@@ -403,7 +403,7 @@ get_centrality_stats <- function(school_network,current_group){
   school_network  <- school_network %>%  as_tbl_graph %>% 
     tidygraph::activate(nodes) %>% 
     mutate(
-      # alpha = centrality_alpha(weights = weight),
+      alpha = centrality_alpha(weights = weight),
       authority = centrality_authority(weights = weight),
       betweenness = centrality_betweenness(weights = weight),
       eigen = centrality_eigen(weights = weight),
@@ -455,7 +455,7 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
   
   school_network <- graph_from_data_frame(select_relations, directed=FALSE, vertices=select_nodos)
   
-  get_centrality_stats(school_network, current_group)
+  tbl_centrality <- get_centrality_stats(school_network, current_group)
   
   if (algorithm=="fg"){
     fc <<- cluster_fast_greedy(school_network) 
@@ -478,6 +478,7 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
   output <- list("mem_list"=mrkt_members_tbl$miembros,
                  "com_stats"=mrkt_members_tbl$com_stats,
                  "algo_stats"=mrkt_members_tbl$algo_stas,
+                 "central_stats"=tbl_centrality,
                  "selected_nodos"= select_nodos, 
                  "select_relations"=select_relations)
 }
@@ -519,6 +520,29 @@ comm_stats_rep <- function(fc) {
   return(tbl_mrkt_grl)
 }
 
+format_ctl <- function(central_stats) {
+  central_stats %>% 
+    select(-grupo) %>%
+    round_df(1) %>% 
+    arrange(-betweenness) %>% 
+    mutate( alpha = color_bar("lightsteelblue")(alpha),
+            authority = color_bar("wheat")(authority),
+            betweenness = color_bar("lightgrey")(betweenness),
+            eigen = color_bar("lightblue")(eigen),
+            hub = color_bar("lightgreen")(hub),
+            pagerank = color_bar("lightblue")(pagerank),
+            subgraph = color_bar("lightseagreen")(subgraph),
+            degree = color_bar("darkgray")(degree)
+    ) %>% 
+    select(name, betweenness, alpha, subgraph, degree, 
+           pagerank, authority, eigen, hub) %>% 
+    rename(CCT=name, Betweenness=betweenness,
+           Alpha=alpha, Subgraph=subgraph, Degree=degree, 
+           Pagerank=pagerank, Authority=authority, Eigen=eigen, Hub=hub) %>% 
+    kable("html", escape = F) %>%
+    kable_styling("hover", full_width = F) %>%
+    column_spec(1, width = "4cm") 
+}
 #### Additionals
 scale <- function(x, t_min, t_max){
   r_min <- min(x)

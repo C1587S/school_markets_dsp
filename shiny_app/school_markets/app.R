@@ -1,6 +1,4 @@
 ## app.R ##
-library(shinydashboard)
-library(leaflet)
 source('utils_v2.R')
 df_buffers <- readRDS("../../data/df_buffers_cdmx.rds")
 proj_buffers <- readRDS("../../data/proj_buffers_cdmx.rds")
@@ -46,30 +44,36 @@ ui <- dashboardPage(
     '))), 
       ##### First tab content (map explorer)
       tabItem(tabName = "tab_map",
-              h2("Mapa de Mercados Educativos en México"),
+              # h3("Mapa de Mercados Educativos en México"),
               fluidRow(
                 column(width = 9,
                        # Map
                        box(width = NULL, solidHeader = TRUE,
-                           leafletOutput("map", height = 500)
+                           leafletOutput("map", height = 450)
                            ),
                        # Box with algo stats
-                       box(width = NULL, status = "warning",
-                           solidHeader=T,
-                           # title="Métricas del algoritmo",
+                       box(width = NULL, status = "success",
+                           solidHeader=T, collapsible=T, collapsed = T,
+                           title="Métricas del algoritmo",
                            tableOutput("algo_stats")
                        ),
                        # Box with group stats
-                       box(width = NULL, status = "warning",
-                           solidHeader=T,collapsible=T,collapsed = T,
+                       box(width = NULL, 
+                           solidHeader=T,collapsible=T, collapsed = T,
                            title="Estadísticas de mercados",
                            tableOutput("community_stats")
-                       ) 
+                       ),
+                       # Box with centraility stats of the members
+                       box(width = NULL, status = "danger",
+                           solidHeader=T,collapsible=T, collapsed = T,
+                           title="Estadísticas de centralidad de los miembros",
+                           tableOutput("centrality_stats")
+                       )
                     
                        ),
                 column(width = 3,
                        # Buffer size
-                       box(width = NULL,collapsible=T, collapsed=T, status = "danger",solidHeader=T,
+                       box(width = NULL,collapsible=T, collapsed=T, status = "info",solidHeader=T,
                            title="Opciones",
                            selectInput("buff_size", "Radio de los buffers", 
                                        c("5 kms", "10 kms", "15 kms")),
@@ -94,7 +98,7 @@ ui <- dashboardPage(
                                                    "Rojo" = "red"))
                                        ),
                            # Box with group members
-                          box(width = NULL, status = "info",
+                          box(width = NULL, status = "danger",
                               solidHeader=T,collapsible=T,
                               title="Miembros de los mercados",
                               tableOutput("mkt_members_tbl")
@@ -123,13 +127,15 @@ ui <- dashboardPage(
 
 server <- function(input, output) {
   set.seed(202011)
+  # Reactive expressions
   values <- reactiveValues()
   observe({
-    values$cz_id <-  input$cz_id
+    values$cz_id <- input$cz_id
     values$algo  <-  input$net_alg
-    values$selected_list <- comp_communities(buffer=values$cz_id, nodos, df, algorithm=values$algo)
-    values$sp_network <- compute_spatial_network(values$selected_list$selected_nodos, 
+    values$selected_list <- comp_communities(buffer=input$cz_id, nodos, df, algorithm=input$net_alg)
+    values$sp_network <- compute_spatial_network(values$selected_list$selected_nodos,
                                           values$selected_list$select_relations)
+    
     values$network <- values$sp_network$network
     values$vert <- values$sp_network$verts
     values$edges <- values$sp_network$edges
@@ -171,11 +177,15 @@ server <- function(input, output) {
   #### Algoritmh Stats
   output$algo_stats <- function(){
     values$selected_list$algo_stats %>% 
-      kable("html") %>% 
-    kable_styling("hover", full_width = F) %>% 
-      scroll_box(height = "70px")
+      kable("html", escape = F) %>% 
+      kable_styling(bootstrap_options = "striped", full_width = F, position = "left")%>% 
+      column_spec(1, width = "4cm") %>% 
+      kable_styling("hover", full_width = F, font_size = 10)
   }
-  
+  #### Centrality Stats
+  output$centrality_stats <- function(){
+    values$selected_list$central_stats %>% format_ctl()
+  }  
 }
 
 shinyApp(ui, server)
