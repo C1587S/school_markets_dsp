@@ -29,7 +29,7 @@ packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly',
 lapply(packages, installations)
 
 ####### Functions geospatial analysis
-calc_buffers <- function(db, radius){
+calc_buffers <- function(db, radius, save=TRUE){
   "Calculates buffers for schools
   Inpunts: 
       - df (dataframe): Dataframe with longitud and latitud cols. 
@@ -55,6 +55,13 @@ calc_buffers <- function(db, radius){
   buffers_proj <- spTransform(buffers, '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
   # return both df and spdf for graph maps
   buffers_outs <- list("df_buffers"= db, "buffers_proj"=buffers_proj)
+  if (save==TRUE){
+    dir.create(file.path("./data/buffers")) # create directory if not exists
+    kms <- radius/1000
+    filename<- paste0("buffers_",kms,"kms.rds")
+    saveRDS(buffers_proj, paste0("./data/buffers/projections_", filename))
+    saveRDS(buffers_outs, paste0("./data/buffers/df_", filename))
+  }
   
   return(buffers_outs)
 }
