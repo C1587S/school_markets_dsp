@@ -49,7 +49,7 @@ ui <- dashboardPage(
                 column(width = 9,
                        # Map
                        box(width = NULL, solidHeader = TRUE,
-                           leafletOutput("map", height = 450)
+                           leafletOutput("map", height = 400)
                            ),
                        # Box with algo stats
                        box(width = NULL, status = "success",
