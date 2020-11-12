@@ -66,7 +66,7 @@ calc_buffers <- function(db, radius, save=TRUE){
   return(buffers_outs)
 }
 
-calc_convexhulls <- function(df_buffers){
+calc_convexhulls <- function(df_buffers, buffsize,save=TRUE){
   "Calculates convexHulls for schools by using buffers
   Inpunts: 
       - df_buffers (dataframe): Dataframe containing buffer number and coordinates 
@@ -101,6 +101,12 @@ calc_convexhulls <- function(df_buffers){
   # return both df and spdf for graph maps
   ch_outs <- list("df_for_ch"= df_buffers_filt, "ch_polygons"=hulls_polygons)
   
+  if (save==TRUE){
+    dir.create(file.path("./data/buffers")) # create directory if not exists
+    filename<- paste0("convexHulls_buffer_",buffsize,"kms.rds")
+    saveRDS(hulls_polygons, paste0("./data/buffers/polygons_", filename))
+    saveRDS(df_buffers_filt, paste0("./data/buffers/df_", filename))
+  }
   return(ch_outs)
 }
 

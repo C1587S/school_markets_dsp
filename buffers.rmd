@@ -22,18 +22,10 @@ db$longitud <- as.numeric(db$longitud)
 #### Function for generating buffers
 ```{r}
 # call our function for calculating buffers
-buff_test <- calc_buffers(db, 5000)
+buff_test <- calc_buffers(db, 5000, save=T)
 # extract relevant elements
 df_buffers <- buff_test$df_buffers
 proj_buffers <- buff_test$buffers_proj
-```
-
-#### Saving the generated buffers
-```{r}
-# saveRDS(df_buffers, "./data/df_buffers_test.rds")
-# saveRDS(proj_buffers, "./data/proj_buffers_test.rds")
-df_buffers <-readRDS("./data/df_buffers_test.rds")
-proj_buffers <- readRDS("./data/proj_buffers_test.rds")
 ```
 
 # convert buffers with one and two schools in polygons
@@ -44,7 +36,7 @@ proj_buffers <- readRDS("./data/proj_buffers_test.rds")
 
 #### Calculate convex hulls
 ```{r}
-ch_df <- calc_convexhulls(df_buffers)
+ch_df <- calc_convexhulls(df_buffers, buffsize="5")
 ```
 
 ## Unions first attempt
