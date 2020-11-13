@@ -448,7 +448,7 @@ get_stats_sub_group <- function(current_sub_group, select_nodos){
 #-----------------------------
 # Subgroup stats
 #-----------------------------
-get_stats_group <- function(select_nodos, current_group) {
+get_stats_group <- function(select_nodos, current_group, save=TRUE) {
   # algorithm
   sub_results <- data.frame(group = -1,
                             mean_dist = -1,
@@ -467,12 +467,16 @@ get_stats_group <- function(select_nodos, current_group) {
     sub_results <- rbind(sub_results, r)
   }
   
-  # sub_results <- sub_results %>% filter(priv != -1)
-  # file_name <- str_c("../../data/results/school_clusters/groups/group_stats/",
-  #                    algorithm, "_group_",current_group,".csv")
-  # 
-  # write.csv(round(sub_results,2),file_name)
+  sub_results <- sub_results %>% filter(priv != -1)
   
+  if (save==TRUE){
+    dir.create(file.path("./results/school_clusters/groups/group_stats")) # create directory if not exists
+    file_name <- str_c("../../data/results/school_clusters/groups/group_stats/",
+                       algorithm, "_group_",current_group,".csv")
+    write.csv(round(sub_results,2),file_name)
+    
+  }
+
   return(sub_results)
   
 }
@@ -703,16 +707,16 @@ format_buff_cts  <- function(dfbuffers){
   num_more3 <- dfbuffers %>% group_by(buffer) %>% 
     summarize(n=n()) %>% filter(n>3) %>% count() 
   
-  note1 <- paste("Total de áreas de desplazamiento:", num_total)
-  note2 <- paste("Áreas de desplazamiento con más de 1 escuela:", num_more1, 
+  note1 <- paste("Total de zonas de desplazamiento:", num_total)
+  note2 <- paste("Zonas de desplazamiento con más de 1 escuela:", num_more1, 
                  "(", round(num_more1*100/num_total, 2), "%)")
-  note3 <- paste("Áreas de desplazamiento con más de 2 escuelas:", num_more2, 
+  note3 <- paste("Zonas de desplazamiento con más de 2 escuelas:", num_more2, 
                  "(", round(num_more2*100/num_total, 2), "%)")
-  note4 <- paste("Áreas de desplazamiento con más de 3 escuelas:", num_more3, 
+  note4 <- paste("Zonas de desplazamiento con más de 3 escuelas:", num_more3, 
                  "(", round(num_more3*100/num_total, 2), "%)")
   
   dfbuffers %>% group_by(buffer) %>% 
-    rename(ZD=buffer) %>% 
+    rename(`Zona de Deplazamiento`=buffer) %>% 
     summarize(n=n()) %>% 
     arrange(-n) %>% 
     kbl() %>%

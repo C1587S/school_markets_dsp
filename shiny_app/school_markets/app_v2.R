@@ -1,19 +1,8 @@
 ## app.R ##
 source('utils_v2.R')
-# df_buffers <- readRDS("../../data/df_buffers_cdmx.rds")
-# proj_buffers <- readRDS("../../data/proj_buffers_cdmx.rds")
-# calculate convex hulls
-# ch_df <- calc_convexhulls(df_buffers)
-# unions
-# unions <- st_union(ch_df$ch_polygons) %>%  st_sf()
-# communities
 path <- "../../data/agregados/"
 df <- readRDS(paste0(path, "agregado_dist_sec_v2.rds"))
-# nodos <- df_buffers %>% rename(grupo=buffer, name=cct, lat=latitud, lon=longitud)
 
-# number of available buffers
-# buffers_list <- df_buffers$buffer %>% unique() %>% as.vector()
-# buffers_list <- c(2, 3, 9, 11, 30, 320, 304)
 
 ### App
 ui <- dashboardPage(
@@ -29,7 +18,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Información", tabName = "tab_info", icon = icon("info-circle")),
       menuItem("Mapa de exploración", tabName = "tab_map", icon = icon("map-marked-alt")),
-      menuItem("Estadísticas", tabName = "tab_tbl", icon = icon("table"))
+      menuItem("Redes", tabName = "tab_networks", icon = icon("network-wired"))
     )
   ),
   
@@ -44,7 +33,8 @@ ui <- dashboardPage(
       }
     '))), 
     ##### First tab content (map explorer)
-    tabItem(tabName = "tab_map",
+    tabItems(
+      tabItem(tabName = "tab_map",
             # h3("Mapa de Mercados Educativos en México"),
             fluidRow(
               column(width = 9,
@@ -73,6 +63,8 @@ ui <- dashboardPage(
                      
               ),
               column(width = 3,
+                     # # Education level
+                     # checkboxInput("educ_level", "Some value", FALSE),
                      # Buffer size
                      box(width = NULL,collapsible=T, collapsed=F, status = "info",solidHeader=T,
                          title="Opciones",
@@ -96,7 +88,10 @@ ui <- dashboardPage(
                          selectInput("edges_color", "Color de las aristas",
                                      choices = c("Gris" = "grey",
                                                  "Negro" = "black", 
-                                                 "Rojo" = "red"))
+                                                 "Rojo" = "red")),
+                         # Save results
+                         checkboxInput("save", "Guardar tablas de resultados", FALSE),
+                         footer = "Se creará la carpeta \"results\" con todas las tablas generadas."
                      ),
                      # Box with group members
                      box(width = NULL, status = "info",
@@ -114,23 +109,20 @@ ui <- dashboardPage(
               )
             )
     ),
-    ##### Second tab content (data analysis)
+    ##### Second tab content (Communities visualization)
     tabItem(tabName = "tab_tbl",
-            h2("")
+            h2("Se adicionará en esta pestaña:")
     ),
     # fluidRow()
-    tabItems(
-      ##### First tab content
-      tabItem(tabName = "tab_info",
-              h2("")
+    ##### First tab content
+      tabItem(tabName = "tab_networks",
+              p("En esta pestaña se adicionará visualización par análisis detallado de los mercados generados con:"),
+              p(a("sigmajs", href="https://sigmajs.john-coene.com/"), "y/o", a("igraph", href="https://igraph.org/r/doc/")),
               
-      )
+              
     )
-  )
-  
-  
-  
 )
+))
 
 server <- function(input, output) {
   set.seed(202011)
