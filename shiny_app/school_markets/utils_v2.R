@@ -490,7 +490,7 @@ get_stats_group <- function(select_nodos, current_group, algorithm,save=TRUE) {
 # Network stats
 #-----------------------------
 
-get_centrality_stats <- function(school_network,current_group){
+get_centrality_stats <- function(school_network,current_group, save=TRUE){
   # https://rdrr.io/cran/tidygraph/man/centrality.html
   school_network  <- school_network %>%  as_tbl_graph %>% 
     tidygraph::activate(nodes) %>% 
@@ -506,10 +506,22 @@ get_centrality_stats <- function(school_network,current_group){
     )
   
   resumen_central <- school_network %>% as_tibble()
-  file_name <- str_c("../../data/results/school_clusters/groups/centrality_stats/",
-                     "group_",current_group,".csv")
   
-  write.csv(resumen_central,file_name)
+  if (save==TRUE){
+    # create directory if not exists
+    dir.create(file.path("./results")) 
+    dir.create(file.path("./results/school_clusters")) 
+    dir.create(file.path("./results/school_clusters/groups")) 
+    dir.create(file.path("./results/school_clusters/groups/centrality_stats"))
+    
+    file_name <- str_c("./results/school_clusters/groups/centrality_stats/",
+                       "group_",current_group,".csv")
+    
+    write.csv(resumen_central,file_name)
+    
+  }
+  
+
   return(resumen_central)
   
 }
