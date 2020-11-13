@@ -136,7 +136,7 @@ compute_spatial_network <- function(select_nodos, select_relations) {
   lines_df <- as.data.frame(lines_sf)  %>% cbind(flujo, scaled_flujo, 
                                                  total, scaled_total, 
                                                  weight, scaled_weight) %>% 
-    rename(lines=geometry)
+                                           rename(lines=geometry)
   
   out_graph = list("network"=network, "verts"=vert, "edges"=lines_df)
   
@@ -193,11 +193,72 @@ map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edg
                      label = ~htmlEscape(paste("CCT:", vert$name, "| Subgrupo:", subgrupo)),
                      labelOptions = labelOptions(direction = "bottom", 
                                                  textsize = "10px", textOnly = TRUE),
-                     group = "Networks") %>% 
+                     group = "Redes") %>% 
     # Additionals
     # Layers control
     addLayersControl(
       overlayGroups = c("Mapa","Escuelas", "Buffers", "Envolventes convexas", "Uniones de envolventes convexas", "Redes"),
+      options = layersControlOptions(collapsed = TRUE)) %>% 
+    hideGroup(c("Escuelas", "Buffers", "Envolventes convexas", "Uniones de envolventes convexas")) %>% 
+    clearBounds()
+}
+map_layers_v2 <- function(vert, df_buffers, ch_df, unions, edges, edges_type="flujo", edges_color) {
+  # this function does not include buffers layers
+  #school icons
+  icons <- awesomeIcons(
+    icon = "graduation-cap", library = "fa",
+    markerColor = "green")
+  # Create a categorical palette for communities along the commuting zone
+  n_sub <- vert$subgrupo %>% unique() %>% length()
+  factpal <- colorFactor(topo.colors(n_sub), vert$subgrupo)
+  
+  if (edges_type=="flujo"){
+    edges_label <- "Flujo: "
+    edges_label2 <- edges$flujo
+    edges_weight <- edges$scaled_flujo
+  } else if (edges_type=="total"){
+    edges_label <- "Cambio total: "
+    edges_label2 <- edges$total
+    edges_weight <- edges$scaled_total
+  } else if (edges_type=="peso"){
+    edges_label <- "Weight: "
+    edges_label2 <- edges$weight
+    edges_weight <- edges$scaled_weight
+  }
+  ### Map
+  leaflet() %>%
+    ## Schools
+    # addTiles() %>% 
+    addProviderTiles(providers$OpenStreetMap.Mapnik, group = "Mapa") %>% 
+    addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud, group = "Escuelas",
+                      clusterOptions = markerClusterOptions(),
+                      label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
+                      labelOptions = labelOptions(direction = "top", 
+                                                  textsize = "10px", textOnly = TRUE),
+                      icon=icons) %>%  
+    # convexhulls
+    addPolygons(data=ch_df$ch_polygons, group = "Envolventes convexas",
+                stroke = FALSE, smoothFactor = 0.2, fillOpacity = 0.2, fillColor="red") %>% 
+    # Unions
+    addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Uniones de envolventes convexas") %>%
+    
+    # # Buffers
+    # addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>% 
+    # 
+    # Networks
+    addPolylines(data=edges$lines, weight=edges_weight, label=paste(edges_label, edges_label2),
+                 color=edges_color, group = "Aristas") %>%
+    addCircleMarkers(data=vert, radius = 6, weight = 6, color=~factpal(subgrupo), 
+                     stroke = TRUE, fillOpacity = 0.5,
+                     label = ~htmlEscape(paste("CCT:", vert$name, "| Subgrupo:", subgrupo)),
+                     labelOptions = labelOptions(direction = "bottom", 
+                                                 textsize = "10px", textOnly = TRUE),
+                     group = "Nodos") %>% 
+    # Additionals
+    # Layers control
+    addLayersControl(
+      overlayGroups = c("Mapa","Escuelas", "Buffers", "Envolventes convexas", "Uniones de envolventes convexas", 
+                        "Nodos", "Aristas"),
       options = layersControlOptions(collapsed = TRUE)) %>% 
     hideGroup(c("Escuelas", "Buffers", "Envolventes convexas", "Uniones de envolventes convexas")) %>% 
     clearBounds()
@@ -403,7 +464,7 @@ get_centrality_stats <- function(school_network,current_group){
   school_network  <- school_network %>%  as_tbl_graph %>% 
     tidygraph::activate(nodes) %>% 
     mutate(
-      alpha = centrality_alpha(weights = weight),
+      # alpha = centrality_alpha(weights = weight),
       authority = centrality_authority(weights = weight),
       betweenness = centrality_betweenness(weights = weight),
       eigen = centrality_eigen(weights = weight),
@@ -525,23 +586,39 @@ format_ctl <- function(central_stats) {
     select(-grupo) %>%
     round_df(1) %>% 
     arrange(-betweenness) %>% 
-    mutate( alpha = color_bar("lightsteelblue")(alpha),
-            authority = color_bar("wheat")(authority),
-            betweenness = color_bar("lightgrey")(betweenness),
-            eigen = color_bar("lightblue")(eigen),
-            hub = color_bar("lightgreen")(hub),
-            pagerank = color_bar("lightblue")(pagerank),
-            subgraph = color_bar("lightseagreen")(subgraph),
-            degree = color_bar("darkgray")(degree)
-    ) %>% 
-    select(name, betweenness, alpha, subgraph, degree, 
+    # mutate( 
+    #   # alpha = color_bar("lightsteelblue")(alpha),
+    #         # authority = color_bar("wheat")(authority),
+    #         # betweenness = color_bar("lightgrey")(betweenness),
+    #         # eigen = color_bar("lightblue")(eigen),
+    #         # hub = color_bar("lightgreen")(hub),
+    #         # pagerank = color_bar("lightblue")(pagerank),
+    #         # subgraph = color_bar("lightseagreen")(subgraph),
+    #         # degree = color_bar("darkgray")(degree)
+    # ) %>% 
+    select(name, betweenness, subgraph, degree, #alpha,
            pagerank, authority, eigen, hub) %>% 
     rename(CCT=name, Betweenness=betweenness,
-           Alpha=alpha, Subgraph=subgraph, Degree=degree, 
+           Subgraph=subgraph, Degree=degree, #Alpha=alpha
            Pagerank=pagerank, Authority=authority, Eigen=eigen, Hub=hub) %>% 
     kable("html", escape = F) %>%
     kable_styling("hover", full_width = F) %>%
     column_spec(1, width = "4cm") 
+}
+
+format_mrcds  <- function(com_stats){
+  legends <- c("N: Nro. de escuelas;",
+               "DistMed: Distancia media (kms);", 
+               "MaxDist: Máxima distancia (kms);",
+               "MinDist: Mínima distancia (kms);",
+               "MedDist: Distancia media (kms);",
+               "Area: Area de Envolvente convexa (kms2);",
+               "Privs: Porcentaje de escuelas privadas (%).")
+  com_stats %>% mutate(N = color_bar("lightgreen")(N)) %>% 
+    kable("html", escape = F) %>%
+    kable_styling("hover", full_width = F) %>%
+    column_spec(1, width = "3cm") %>%
+    footnote(number = c(legends))
 }
 #### Additionals
 scale <- function(x, t_min, t_max){
