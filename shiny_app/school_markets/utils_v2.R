@@ -25,7 +25,7 @@ packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly',
               'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
               'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
               'tidygraph', 'GeoRange', 'geosphere', 'igraphdata', 'shinydashboard',
-              'leaflet.extras', 'kableExtra', 'formattable', 'shinydashboard')
+              'leaflet.extras', 'kableExtra', 'formattable', 'shinydashboard', 'usethis')
 
 lapply(packages, installations)
 
