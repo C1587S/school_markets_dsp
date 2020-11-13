@@ -16,12 +16,11 @@ ui <- dashboardPage(
   dashboardSidebar(
     width = 180,
     sidebarMenu(
-      menuItem("Información", tabName = "tab_info", icon = icon("info-circle")),
+      # menuItem("Información", tabName = "tab_info", icon = icon("info-circle")),
       menuItem("Mapa de exploración", tabName = "tab_map", icon = icon("map-marked-alt")),
       menuItem("Redes", tabName = "tab_networks", icon = icon("network-wired"))
     )
   ),
-  
   
   ## Body content
   dashboardBody(
@@ -90,13 +89,13 @@ ui <- dashboardPage(
                                                  "Negro" = "black", 
                                                  "Rojo" = "red")),
                          # Save results
-                         checkboxInput("save", "Guardar tablas de resultados", FALSE),
+                         checkboxInput("save", "Guardar tablas de resultados", F),
                          footer = "Se creará la carpeta \"results\" con todas las tablas generadas."
                      ),
                      # Box with group members
                      box(width = NULL, status = "info",
                          solidHeader=T, collapsible=T, collapsed=T,
-                         title="Composición de área de desplazamiento",
+                         title="Composición",
                          tableOutput("res_buffer")
                      ),
                      # Box with group members
@@ -130,6 +129,8 @@ server <- function(input, output) {
   values <- reactiveValues()
   df_reactive <- reactiveValues()
   observe({
+    # saving options
+    values$save <- input$save
     # selecting buffer size
     if(input$buff_size=="5k"){
       df_reactive$dfbuffers <- readRDS("../../data/buffers/radio_10kms.rds") %>% 
@@ -176,7 +177,8 @@ server <- function(input, output) {
     
     values$cz_id <- input$cz_id
     values$algo  <-  input$net_alg
-    values$selected_list <- comp_communities(buffer=input$cz_id, df_reactive$nodos, df, algorithm=input$net_alg)
+    values$selected_list <- comp_communities(buffer=input$cz_id, df_reactive$nodos, df, algorithm=input$net_alg,
+                                             values$save)
     values$sp_network <- compute_spatial_network(values$selected_list$selected_nodos,
                                                  values$selected_list$select_relations)
     

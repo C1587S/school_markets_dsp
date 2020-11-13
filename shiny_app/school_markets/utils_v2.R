@@ -355,7 +355,7 @@ get_select_nodos <- function(select_relations,current_group){
 #-----------------------------
 # Community Functions
 #-----------------------------
-get_community_stats <- function(fc){
+get_community_stats <- function(fc, current_group,save=TRUE){
   sizes_fc <- sizes(fc)
   stats <- data.frame(
     algoritm =   algorithm(fc),
@@ -366,6 +366,20 @@ get_community_stats <- function(fc){
     max_size = max(sizes_fc),
     min_size= min(sizes_fc)
   )
+  
+  if (save==TRUE){
+    # create directory if not exists
+    dir.create(file.path("./results")) 
+    dir.create(file.path("./results/school_clusters")) 
+    dir.create(file.path("./results/school_clusters/groups")) 
+    dir.create(file.path("./results/school_clusters/groups/select_nodos"))
+    
+    algorithm <- str_replace(algorithm(fc), " ", "_")
+    file_name <- str_c("./results/school_clusters/groups/select_nodos/algostats_",
+                       algorithm, "_group_",current_group,".csv")
+    write_csv(stats, file_name)
+    
+  }
   return(stats)
 }
 
@@ -392,7 +406,7 @@ save_map <- function(select_nodos,algorithm, current_group,num_plot=10){
   ggsave(filename = file_name, g)
 }
 
-save_subgroups <- function(fc, select_nodos,algorithm,current_group){
+save_subgroups <- function(fc, select_nodos,algorithm,current_group, save=TRUE){
   fccommunity<- membership(fc)
   
   select_nodos$sub_grupo <- 0
@@ -402,11 +416,19 @@ save_subgroups <- function(fc, select_nodos,algorithm,current_group){
     select_nodos$sub_grupo[i] <- fccommunity[escuela][[1]]
   }
   
-  file_name <- str_c("../../data/results/school_clusters/groups/select_nodos/",
-                     algorithm, "_group_",current_group,".csv")
-  sub_df <- select_nodos %>% 
-    dplyr::select(name, grupo, sub_grupo)
-  write_csv(sub_df,file_name)
+  if (save==TRUE){
+    # create directory if not exists
+    dir.create(file.path("./results")) 
+    dir.create(file.path("./results/school_clusters")) 
+    dir.create(file.path("./results/school_clusters/groups")) 
+    dir.create(file.path("./results/school_clusters/groups/select_nodos"))
+    
+    file_name <- str_c("./results/school_clusters/groups/select_nodos/",
+                       algorithm, "_group_",current_group,".csv")
+    sub_df <- select_nodos %>% dplyr::select(name, grupo, sub_grupo)
+    write_csv(sub_df, file_name)
+    
+  }
   return(select_nodos)
 }
 
@@ -537,7 +559,7 @@ compare_clustering_algorithms <- function(fc, select_nodos, current_group){
   
   #save_map(select_nodos,algorithm, current_group)
   get_stats_group(select_nodos, algorithm, current_group)
-  return(get_community_stats(fc)) 
+  return(get_community_stats(fc, current_group)) 
 }
 
 get_new_nodes <- function(algorithm, current_group){
@@ -550,7 +572,7 @@ get_new_nodes <- function(algorithm, current_group){
 
 
 ########## Big function
-comp_communities <- function(buffer, nodos, df, algorithm) {
+comp_communities <- function(buffer, nodos, df, algorithm, save=T) {
   current_group <- buffer
   relations <- get_relations(nodos, df)
   
@@ -559,7 +581,7 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
   
   school_network <- graph_from_data_frame(select_relations, directed=FALSE, vertices=select_nodos)
   
-  tbl_centrality <- get_centrality_stats(school_network, current_group)
+  tbl_centrality <- get_centrality_stats(school_network, current_group, save=save)
   
   if (algorithm=="fg"){
     fc <<- cluster_fast_greedy(school_network) 
@@ -575,9 +597,9 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
   
   algorithm <- str_replace(algorithm(fc), " ", "_")
   select_nodos <- save_subgroups(fc, select_nodos,
-                                 algorithm, current_group)
+                                 algorithm, current_group, save=save)
   # tables with community members
-  mrkt_members_tbl <- tbls_mrkt_members(select_nodos, current_group, algorithm)
+  mrkt_members_tbl <- tbls_mrkt_members(select_nodos, current_group, algorithm, save=save)
   
   output <- list("mem_list"=mrkt_members_tbl$miembros,
                  "com_stats"=mrkt_members_tbl$com_stats,
@@ -589,21 +611,21 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
 
 ###############
 ## tables for shiny
-tbls_mrkt_members <- function(select_nodos, current_group, algorithm) {
+tbls_mrkt_members <- function(select_nodos, current_group, algorithm, save=T) {
   # School of each market
   tbl_miembros <- select_nodos %>% rename(CCT=name, Latitud=lat, Longitud=lon, Mercado=sub_grupo) %>% 
     arrange(Mercado) %>% 
     mutate_at(vars(Mercado), funs(factor))
   tbl_miembros <- tbl_miembros[c("CCT", "Mercado", "Latitud", "Longitud" )]
   # community stats
-  com_stats <- get_stats_group(select_nodos, current_group, algorithm)%>% 
+  com_stats <- get_stats_group(select_nodos, current_group, algorithm, save)%>% 
     filter(group>0) %>% 
     mutate_at(vars(group), funs(factor)) %>% 
     rename(Mercado=group, DistMed=mean_dist, MaxDist=max_dist, MinDist=min_dist,
            MedDist=median_dist, Area=convex_hull, N=num_elem_subgroup, Privs=priv) %>% 
     select(Mercado, N, everything()) %>% arrange(-N) %>% round_df(4)
   # algorithm stats
-  algo_tbl <- get_community_stats(fc) %>% rename(Algoritmo=algoritm, 
+  algo_tbl <- get_community_stats(fc, current_group, save) %>% rename(Algoritmo=algoritm, 
                                                  Modularidad=modularity,
                                                  Mercados=num_groups,
                                                  Media=mean_size,
@@ -615,8 +637,8 @@ tbls_mrkt_members <- function(select_nodos, current_group, algorithm) {
   return(out)
 }
 
-comm_stats_rep <- function(fc) {
-  tbl_mrkt_grl <- get_community_stats(fc)
+comm_stats_rep <- function(fc, algorithm) {
+  tbl_mrkt_grl <- get_community_stats(fc, current_group)
   tbl_mrkt_grl <- tbl_mrkt_grl %>% 
     rename(Algoritmo=algoritm, Modularidad=modularity, `Nro. Mercados`=num_groups,
            `Tamaño promedio`=mean_size, `Mediana del tamaño`=median_size, 
