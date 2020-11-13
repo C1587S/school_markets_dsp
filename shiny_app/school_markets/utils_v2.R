@@ -289,7 +289,29 @@ get_relations <- function(nodos, df) {
     na.omit()
   return(relations)
 }
-get_select_relations <- function(nodos, current_group, relations){
+get_relations_v2 <- function(nodos, df, fil_dist=100) {
+  relations <- df %>%
+    filter(distancia<fil_dist) %>%
+    # filter(numDest >1) %>% 
+    mutate(proporcion = numDest/numSalen) %>%  # Tipo page-rank. numSalen 
+    mutate(cct_d_u = ifelse(cct_d < cct_o, cct_d, cct_o)) %>%
+    mutate(cct_o_u = ifelse(cct_d < cct_o, cct_o, cct_d)) %>%
+    group_by(cct_d_u, cct_o_u) %>%
+    dplyr::summarise(total_cambian = sum(numSalen),
+                     flujo = sum(numDest),
+                     weight = flujo /total_cambian, `.groups`="drop") %>%
+    ungroup() %>% 
+    rename(cct_d = cct_d_u, cct_o = cct_o_u) %>% 
+    rename(name = cct_d) %>% 
+    left_join(nodos, by= c("name")) %>% 
+    rename( cct_d =name , latitud_d = lat, longitud_d = lon) %>% 
+    rename(name = cct_o) %>% 
+    left_join(nodos, by= c("name")) %>% 
+    rename( cct_o =name , latitud_o = lat, longitud_o = lon) %>% 
+    na.omit()
+  return(relations)
+}
+get_select_relations <- function(nodos, current_group=2, relations){
   select_nodos <- nodos %>% filter(grupo == current_group)
   
   # Encontrar las relaciones entre los nodos del mismo grupo
@@ -543,6 +565,42 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
                  "selected_nodos"= select_nodos, 
                  "select_relations"=select_relations)
 }
+comp_communities_v2 <- function(buffer, nodos, df, algorithm, fil_dist=100) {
+  current_group <- buffer
+  relations <- get_relations_v2(nodos, df, fil_dist)
+  
+  select_relations <- get_select_relations(nodos, current_group, relations)
+  select_nodos <- get_select_nodos(select_relations, current_group)
+  
+  school_network <- graph_from_data_frame(select_relations, directed=FALSE, vertices=select_nodos)
+  
+  tbl_centrality <- get_centrality_stats(school_network, current_group)
+  
+  if (algorithm=="fg"){
+    fc <<- cluster_fast_greedy(school_network) 
+  } else if (algorithm=="wt"){
+    fc <<- cluster_walktrap(school_network)
+  } else if (algorithm=="lp"){
+    fc <<- cluster_label_prop(school_network)
+  } else if (algorithm=="le"){
+    fc <<- cluster_leading_eigen(school_network)
+  } else if (algorithm=="cl"){
+    fc <<- cluster_louvain(school_network)
+  }
+  
+  algorithm <- str_replace(algorithm(fc), " ", "_")
+  select_nodos <- save_subgroups(fc, select_nodos,
+                                 algorithm, current_group)
+  # tables with community members
+  mrkt_members_tbl <- tbls_mrkt_members(select_nodos, current_group)
+  
+  output <- list("mem_list"=mrkt_members_tbl$miembros,
+                 "com_stats"=mrkt_members_tbl$com_stats,
+                 "algo_stats"=mrkt_members_tbl$algo_stas,
+                 "central_stats"=tbl_centrality,
+                 "selected_nodos"= select_nodos, 
+                 "select_relations"=select_relations)
+}
 ###############
 ## tables for shiny
 tbls_mrkt_members <- function(select_nodos, current_group) {
@@ -602,12 +660,12 @@ format_ctl <- function(central_stats) {
            Subgraph=subgraph, Degree=degree, #Alpha=alpha
            Pagerank=pagerank, Authority=authority, Eigen=eigen, Hub=hub) %>% 
     kable("html", escape = F) %>%
-    kable_styling("hover", full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>%
     column_spec(1, width = "4cm") 
 }
 
 format_mrcds  <- function(com_stats){
-  legends <- c("N: Nro. de escuelas;",
+  legends <- c("N: Número de escuelas;",
                "DistMed: Distancia media (kms);", 
                "MaxDist: Máxima distancia (kms);",
                "MinDist: Mínima distancia (kms);",
@@ -616,9 +674,52 @@ format_mrcds  <- function(com_stats){
                "Privs: Porcentaje de escuelas privadas (%).")
   com_stats %>% mutate(N = color_bar("lightgreen")(N)) %>% 
     kable("html", escape = F) %>%
-    kable_styling("hover", full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>%
     column_spec(1, width = "3cm") %>%
     footnote(number = c(legends))
+}
+
+format_algo  <- function(algo_stats){
+  algo_stats %>% kable("html", escape = F) %>% 
+    kable_styling(bootstrap_options = "striped", full_width = F, position = "left")%>% 
+    column_spec(1, width = "4cm") %>% 
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+}
+
+format_mbrs  <- function(mkt_members_tbl){
+  mkt_members_tbl %>% kbl(booktabs = T) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), font_size = 8,
+                  position = "float_right") %>% 
+    scroll_box(width = "230px", height = "520px")
+}
+
+format_buff_cts  <- function(dfbuffers){
+  # footnotes
+  num_total <- dfbuffers %>% distinct(buffer) %>% count()
+  num_more1 <- dfbuffers %>% group_by(buffer) %>% 
+    summarize(n=n()) %>% filter(n>1) %>% count() 
+  num_more2 <- dfbuffers %>% group_by(buffer) %>% 
+    summarize(n=n()) %>% filter(n>2) %>% count()
+  num_more3 <- dfbuffers %>% group_by(buffer) %>% 
+    summarize(n=n()) %>% filter(n>3) %>% count() 
+  
+  note1 <- paste("Total de áreas de desplazamiento:", num_total)
+  note2 <- paste("Áreas de desplazamiento con más de 1 escuela:", num_more1, 
+                 "(", round(num_more1*100/num_total, 2), "%)")
+  note3 <- paste("Áreas de desplazamiento con más de 2 escuelas:", num_more2, 
+                 "(", round(num_more2*100/num_total, 2), "%)")
+  note4 <- paste("Áreas de desplazamiento con más de 3 escuelas:", num_more3, 
+                 "(", round(num_more3*100/num_total, 2), "%)")
+  
+  dfbuffers %>% group_by(buffer) %>% 
+    rename(ZD=buffer) %>% 
+    summarize(n=n()) %>% 
+    arrange(-n) %>% 
+    kbl() %>%
+    kable_minimal(full_width = F, position = "left") %>% 
+    kable_styling(bootstrap_options = c("striped", "hover"), font_size = 10) %>% 
+    scroll_box(width = "230px", height = "200px") %>% 
+    footnote(alphabet = c(note1, note2, note3, note4))
 }
 #### Additionals
 scale <- function(x, t_min, t_max){
