@@ -1,7 +1,5 @@
 ## app.R ##
 source('utils_v2.R')
-path <- "../../data/agregados/"
-# df <- readRDS(paste0(path, "agregado_dist_sec_v2.rds"))
 
 ### App
 ui <- dashboardPage(
@@ -112,17 +110,15 @@ ui <- dashboardPage(
               )
             )
     ),
-    ##### Second tab content (Communities visualization)
-    tabItem(tabName = "tab_tbl",
-            h2("Se adicionará en esta pestaña:")
-    ),
+    # ##### Second tab content (Communities visualization)
+    # tabItem(tabName = "tab_tbl",
+    #         h2("Se adicionará en esta pestaña:")
+    # ),
     # fluidRow()
     ##### First tab content
       tabItem(tabName = "tab_networks",
               p("En esta pestaña se adicionará visualización par análisis detallado de los mercados generados con:"),
-              p(a("sigmajs", href="https://sigmajs.john-coene.com/"), "y/o", a("igraph", href="https://igraph.org/r/doc/")),
-              
-              
+              p(a("sigmajs", href="https://sigmajs.john-coene.com/"), "y/o", a("igraph", href="https://igraph.org/r/doc/"))
     )
 )
 ))
@@ -171,7 +167,7 @@ server <- function(input, output) {
       df_reactive$unions <- st_union(df_reactive$ch_df$ch_polygons) %>%  st_sf()
       
     } else if (input$buff_size=="15k"){
-      df_reactive$dfbuffers <- readRDS("../../data/buffers/radio_10kms.rds") %>% 
+      df_reactive$dfbuffers <- readRDS("../../data/buffers/radio_15kms.rds") %>% 
         rename(cct=name, buffer=buff_num) %>% 
         select(-X) %>% select(cct, everything()) %>% 
         arrange(as.numeric(buffer))
@@ -184,7 +180,6 @@ server <- function(input, output) {
       # calculate unions
       df_reactive$unions <- st_union(df_reactive$ch_df$ch_polygons) %>%  st_sf()
     }
-    
     values$cz_id <- input$cz_id
     values$algo  <-  input$net_alg
     values$selected_list <- comp_communities(buffer=input$cz_id, df_reactive$nodos, df_reactive$df, algorithm=input$net_alg,
@@ -205,7 +200,6 @@ server <- function(input, output) {
     map_layers_v2(values$vert, df_reactive$dfbuffers, df_reactive$ch_df, df_reactive$unions, values$edges,
                edges_type=values$edges_plot, edges_color=values$edges_color)
   })
-  
   #### Markets schools
   output$mkt_members_tbl <-  function() {
     values$selected_list$mem_list %>%  format_mbrs()
