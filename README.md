@@ -1,14 +1,6 @@
----
-title: Reporte de Mercados Educativos
-author: Sebastián Cadavid-Sánchez & Paola Mejía Domenzaín
-date: Octubre de 2020
-subject: "mercados_educativos"
-lang: "es"
-titlepage: true,
-titlepage-rule-color: "360049"
-toc-own-page: true
-number_sections: yes
-...
+
+# Reporte de Mercados Educativos
+**CIE**
 
 ## Datos
 
