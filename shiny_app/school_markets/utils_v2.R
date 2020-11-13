@@ -448,7 +448,7 @@ get_stats_sub_group <- function(current_sub_group, select_nodos){
 #-----------------------------
 # Subgroup stats
 #-----------------------------
-get_stats_group <- function(select_nodos, current_group, save=TRUE) {
+get_stats_group <- function(select_nodos, current_group, algorithm,save=TRUE) {
   # algorithm
   sub_results <- data.frame(group = -1,
                             mean_dist = -1,
@@ -468,12 +468,17 @@ get_stats_group <- function(select_nodos, current_group, save=TRUE) {
   }
   
   sub_results <- sub_results %>% filter(priv != -1)
-  
+
   if (save==TRUE){
-    dir.create(file.path("./results/school_clusters/groups/group_stats")) # create directory if not exists
-    file_name <- str_c("../../data/results/school_clusters/groups/group_stats/",
+    # create directory if not exists
+    dir.create(file.path("./results")) 
+    dir.create(file.path("./results/school_clusters")) 
+    dir.create(file.path("./results/school_clusters/groups")) 
+    dir.create(file.path("./results/school_clusters/groups/group_stats"))
+    
+    file_name <- str_c("./results/school_clusters/groups/group_stats/",
                        algorithm, "_group_",current_group,".csv")
-    write.csv(round(sub_results,2),file_name)
+    write.csv(round(sub_results, 2),file_name)
     
   }
 
@@ -560,7 +565,7 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
   select_nodos <- save_subgroups(fc, select_nodos,
                                  algorithm, current_group)
   # tables with community members
-  mrkt_members_tbl <- tbls_mrkt_members(select_nodos, current_group)
+  mrkt_members_tbl <- tbls_mrkt_members(select_nodos, current_group, algorithm)
   
   output <- list("mem_list"=mrkt_members_tbl$miembros,
                  "com_stats"=mrkt_members_tbl$com_stats,
@@ -569,52 +574,17 @@ comp_communities <- function(buffer, nodos, df, algorithm) {
                  "selected_nodos"= select_nodos, 
                  "select_relations"=select_relations)
 }
-comp_communities_v2 <- function(buffer, nodos, df, algorithm, fil_dist=100) {
-  current_group <- buffer
-  relations <- get_relations_v2(nodos, df, fil_dist)
-  
-  select_relations <- get_select_relations(nodos, current_group, relations)
-  select_nodos <- get_select_nodos(select_relations, current_group)
-  
-  school_network <- graph_from_data_frame(select_relations, directed=FALSE, vertices=select_nodos)
-  
-  tbl_centrality <- get_centrality_stats(school_network, current_group)
-  
-  if (algorithm=="fg"){
-    fc <<- cluster_fast_greedy(school_network) 
-  } else if (algorithm=="wt"){
-    fc <<- cluster_walktrap(school_network)
-  } else if (algorithm=="lp"){
-    fc <<- cluster_label_prop(school_network)
-  } else if (algorithm=="le"){
-    fc <<- cluster_leading_eigen(school_network)
-  } else if (algorithm=="cl"){
-    fc <<- cluster_louvain(school_network)
-  }
-  
-  algorithm <- str_replace(algorithm(fc), " ", "_")
-  select_nodos <- save_subgroups(fc, select_nodos,
-                                 algorithm, current_group)
-  # tables with community members
-  mrkt_members_tbl <- tbls_mrkt_members(select_nodos, current_group)
-  
-  output <- list("mem_list"=mrkt_members_tbl$miembros,
-                 "com_stats"=mrkt_members_tbl$com_stats,
-                 "algo_stats"=mrkt_members_tbl$algo_stas,
-                 "central_stats"=tbl_centrality,
-                 "selected_nodos"= select_nodos, 
-                 "select_relations"=select_relations)
-}
+
 ###############
 ## tables for shiny
-tbls_mrkt_members <- function(select_nodos, current_group) {
+tbls_mrkt_members <- function(select_nodos, current_group, algorithm) {
   # School of each market
   tbl_miembros <- select_nodos %>% rename(CCT=name, Latitud=lat, Longitud=lon, Mercado=sub_grupo) %>% 
     arrange(Mercado) %>% 
     mutate_at(vars(Mercado), funs(factor))
   tbl_miembros <- tbl_miembros[c("CCT", "Mercado", "Latitud", "Longitud" )]
   # community stats
-  com_stats <- get_stats_group(select_nodos, current_group)%>% 
+  com_stats <- get_stats_group(select_nodos, current_group, algorithm)%>% 
     filter(group>0) %>% 
     mutate_at(vars(group), funs(factor)) %>% 
     rename(Mercado=group, DistMed=mean_dist, MaxDist=max_dist, MinDist=min_dist,
