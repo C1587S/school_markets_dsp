@@ -1,0 +1,34 @@
+## Notebook for computing buffers
+
+```{r, include=FALSE}
+source('utils.R')
+library(leaflet)
+library(mapview)
+library(htmltools)
+```
+
+#### Load the data
+```{r}
+db <- readRDS("./data/master_db_filtered.rds")
+```
+
+#### Preparing the data for computing buffers
+```{r}
+# using a sample
+db <- sample_n(db, 4000)
+db$latitud <- as.numeric(db$latitud)
+db$longitud <- as.numeric(db$longitud)
+```
+
+#### Function for generating buffers
+```{r}
+# call our function for calculating buffers
+
+for (buff in c(5000, 10000, 15000)){
+  calc_buffers(db, 5000, save=TRUE)  
+}
+```
+
+
+
+
