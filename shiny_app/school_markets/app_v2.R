@@ -1,8 +1,7 @@
 ## app.R ##
 source('utils_v2.R')
 path <- "../../data/agregados/"
-df <- readRDS(paste0(path, "agregado_dist_sec_v2.rds"))
-
+# df <- readRDS(paste0(path, "agregado_dist_sec_v2.rds"))
 
 ### App
 ui <- dashboardPage(
@@ -67,6 +66,11 @@ ui <- dashboardPage(
                      # Buffer size
                      box(width = NULL,collapsible=T, collapsed=F, status = "info",solidHeader=T,
                          title="Opciones",
+                         # Select algorithm for create communities
+                         selectInput("educ_level", "Nivel educativo",
+                                     choices = c("Secundaria" = "secundaria", 
+                                                 "Primaria" = "primaria")),
+                         # buffer size
                          selectInput("buff_size", "Radio de los buffers", 
                                      choices=(c("5 kms"="5k", "10 kms"="10k", "15 kms"="15k"))),
                          # Select commuting zone
@@ -131,6 +135,12 @@ server <- function(input, output) {
   observe({
     # saving options
     values$save <- input$save
+    # select education level
+    if(input$educ_level=="primaria"){
+      df_reactive$df <- readRDS("../../data/agregados/agregado_dist_prim_v2.rds")
+    } else if (input$educ_level=="secundaria"){
+      df_reactive$df <- readRDS("../../data/agregados/agregado_dist_sec_v2.rds")
+    }
     # selecting buffer size
     if(input$buff_size=="5k"){
       df_reactive$dfbuffers <- readRDS("../../data/buffers/radio_10kms.rds") %>% 
@@ -177,7 +187,7 @@ server <- function(input, output) {
     
     values$cz_id <- input$cz_id
     values$algo  <-  input$net_alg
-    values$selected_list <- comp_communities(buffer=input$cz_id, df_reactive$nodos, df, algorithm=input$net_alg,
+    values$selected_list <- comp_communities(buffer=input$cz_id, df_reactive$nodos, df_reactive$df, algorithm=input$net_alg,
                                              values$save)
     values$sp_network <- compute_spatial_network(values$selected_list$selected_nodos,
                                                  values$selected_list$select_relations)
