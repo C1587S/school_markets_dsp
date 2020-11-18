@@ -8,7 +8,7 @@ Esta herramienta de visualización se generó utilizando la librería `shiny` de
 
 La visualización general de la aplicación es la siguiente: 
 
-![](imgs/shiny_mapa.png)
+![](imgs/shiny_mapa2.png)
 
 En las siguientes secciones se documenta su uso. 
 
