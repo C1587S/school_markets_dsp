@@ -143,7 +143,7 @@ compute_spatial_network <- function(select_nodos, select_relations) {
   return(out_graph)
 }
 
-map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edges_type="flujo", edges_color) {
+map_layers <- function(vert, df_buffers, sel_buff,buffer, ch_df, unions, proj_buffers, edges, edges_type="flujo", edges_color) {
   #school icons
   icons <- awesomeIcons(
     icon = "graduation-cap", library = "fa",
@@ -166,11 +166,15 @@ map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edg
     edges_weight <- edges$scaled_weight
   }
   ### Map
-  leaflet() %>%
+  if(missing(sel_buff)) {
+    data <- df_buffers
+  } else {
+    data <- df_buffers %>% filter(buffer==sel_buff)
+  }
     ## Schools
     # addTiles() %>% 
     addProviderTiles(providers$OpenStreetMap.Mapnik, group = "Mapa") %>% 
-    addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud, group = "Escuelas",
+    addAwesomeMarkers(data=data, ~longitud, ~latitud, group = "Escuelas",
                       clusterOptions = markerClusterOptions(),
                       label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
                       labelOptions = labelOptions(direction = "top", 
@@ -202,7 +206,8 @@ map_layers <- function(vert, df_buffers, ch_df, unions, proj_buffers, edges, edg
     hideGroup(c("Escuelas", "Buffers", "Envolventes convexas", "Uniones de envolventes convexas")) %>% 
     clearBounds()
 }
-map_layers_v2 <- function(vert, df_buffers, ch_df, unions, edges, edges_type="flujo", edges_color) {
+map_layers_v2 <- function(vert, df_buffers, proj_buffers, sel_buff, ch_df, unions, 
+                          edges, edges_type="flujo", edges_color) {
   # this function does not include buffers layers
   #school icons
   icons <- awesomeIcons(
@@ -225,14 +230,20 @@ map_layers_v2 <- function(vert, df_buffers, ch_df, unions, edges, edges_type="fl
     edges_label2 <- edges$weight
     edges_weight <- edges$scaled_weight
   }
+  
+  if(missing(sel_buff)) {
+    data <- df_buffers
+  } else {
+    data <- df_buffers %>% filter(buffer==sel_buff)
+  }
   ### Map
   leaflet() %>%
-    ## Schools
     # addTiles() %>% 
     addProviderTiles(providers$OpenStreetMap.Mapnik, group = "Mapa") %>% 
+    ## Schools
     addAwesomeMarkers(data=df_buffers, ~longitud, ~latitud, group = "Escuelas",
                       clusterOptions = markerClusterOptions(),
-                      label = ~htmlEscape(paste("CCT:", cct, "Buffer", buffer)),
+                      label = ~htmlEscape(paste("CCT:", cct, "| Buffer", buffer)),
                       labelOptions = labelOptions(direction = "top", 
                                                   textsize = "10px", textOnly = TRUE),
                       icon=icons) %>%  
@@ -243,7 +254,7 @@ map_layers_v2 <- function(vert, df_buffers, ch_df, unions, edges, edges_type="fl
     addPolygons(data=unions, weight = 3, fillColor = "yellow", group = "Uniones de envolventes convexas") %>%
     
     # # Buffers
-    # addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>% 
+    addPolygons(data=proj_buffers, weight = 3, fillColor = "green", group = "Buffers") %>%
     # 
     # Networks
     addPolylines(data=edges$lines, weight=edges_weight, label=paste(edges_label, edges_label2),
@@ -270,7 +281,7 @@ map_layers_v2 <- function(vert, df_buffers, ch_df, unions, edges, edges_type="fl
 get_relations <- function(nodos, df) {
   relations <- df %>%
     # filter(distancia<30) %>%
-    # filter(numDest >1) %>% 
+    filter(numDest >1) %>%
     mutate(proporcion = numDest/numSalen) %>%  # Tipo page-rank. numSalen 
     mutate(cct_d_u = ifelse(cct_d < cct_o, cct_d, cct_o)) %>%
     mutate(cct_o_u = ifelse(cct_d < cct_o, cct_o, cct_d)) %>%
@@ -311,7 +322,7 @@ get_relations_v2 <- function(nodos, df, fil_dist=100) {
     na.omit()
   return(relations)
 }
-get_select_relations <- function(nodos, current_group=2, relations){
+get_select_relations <- function(nodos, current_group, relations){
   select_nodos <- nodos %>% filter(grupo == current_group)
   
   # Encontrar las relaciones entre los nodos del mismo grupo
@@ -606,7 +617,8 @@ comp_communities <- function(buffer, nodos, df, algorithm, save=T) {
                  "algo_stats"=mrkt_members_tbl$algo_stas,
                  "central_stats"=tbl_centrality,
                  "selected_nodos"= select_nodos, 
-                 "select_relations"=select_relations)
+                 "select_relations"=select_relations,
+                 "relations"=relations)
 }
 
 ###############
@@ -670,6 +682,31 @@ format_ctl <- function(central_stats) {
     kable("html", escape = F) %>%
     kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>%
     column_spec(1, width = "4cm") 
+}
+
+df_buffers_join <- function(df, df_buffers) {
+  # See: http://cumplimientopef.sep.gob.mx/glosario_de_terminos/
+  preescolar <- c("CC", "JN") # indígena y general
+  secundarias <- c("ES", "ST", "TV") # indígena, general y telesecundaria
+  primarias <- c("PB") # indígena y general
+  
+  cct_o <-df %>% mutate(tipo_educ_o = substr(cct_o, 4,5), tipo_educ_d = substr(cct_o, 4,5)) %>% 
+    filter(tipo_educ_o %in% secundarias && tipo_educ_d %in% secundarias) %>% 
+    distinct(cct_o, .keep_all = TRUE) %>% 
+    dplyr::select(cct_o, latitud_o, longitud_o) %>% 
+    rename(lat = latitud_o, lon = longitud_o, name = cct_o)
+  cct_d <-df %>% mutate(tipo_educ_o = substr(cct_o, 4,5), tipo_educ_d = substr(cct_o, 4,5)) %>% 
+    filter(tipo_educ_o %in% secundarias && tipo_educ_d %in% secundarias) %>% 
+    distinct(cct_d, .keep_all = TRUE) %>% 
+    dplyr::select(cct_d, latitud_d, longitud_d) %>% 
+    rename(lat = latitud_d, lon = longitud_d, name = cct_d)
+  
+  schools_df <- rbind(cct_d, cct_o) %>% distinct(name, .keep_all = TRUE) %>% 
+    rename(cct = name, latitud=lat, longitud=lon)
+  
+  
+  schools_df <- left_join(df_buffers, schools_df)
+  return(schools_df)
 }
 
 format_mrcds  <- function(com_stats){

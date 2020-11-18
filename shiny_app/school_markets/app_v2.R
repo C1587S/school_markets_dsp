@@ -1,12 +1,13 @@
 ## app.R ##
+options(warn=-1)
 source('utils_v2.R')
 
-### App
+### Apphttp://127.0.0.1:7908/#shiny-tab-tab_map
 ui <- dashboardPage(
   skin = "red",
   dashboardHeader(
     title = "Mercados Educativos en México",
-    titleWidth = 450),
+    titleWidth = 850),
   
   
   ## Sidebar content
@@ -14,8 +15,8 @@ ui <- dashboardPage(
     width = 180,
     sidebarMenu(
       # menuItem("Información", tabName = "tab_info", icon = icon("info-circle")),
-      menuItem("Mapa de exploración", tabName = "tab_map", icon = icon("map-marked-alt")),
-      menuItem("Redes", tabName = "tab_networks", icon = icon("network-wired"))
+      menuItem("Mapa de exploración", tabName = "tab_map", icon = icon("globe", lib = "glyphicon")),
+      menuItem("Redes", tabName = "tab_networks", icon = icon("option-vertical", lib = "glyphicon"))
     )
   ),
   
@@ -72,7 +73,8 @@ ui <- dashboardPage(
                          selectInput("buff_size", "Radio de los buffers", 
                                      choices=(c("5 kms"="5k", "10 kms"="10k", "15 kms"="15k"))),
                          # Select commuting zone
-                         numericInput("cz_id", "Zona de desplazamiento", value = 2),
+                         numericInput("cz_id", "Zona de desplazamiento", value = 555),
+                         # uiOutput("cz_id"),
                          # Select algorithm for create communities
                          selectInput("net_alg", "Algoritmo de redes",
                                      choices = c("Fast greedy" = "fg",
@@ -128,6 +130,8 @@ server <- function(input, output) {
   # Reactive expressions
   values <- reactiveValues()
   df_reactive <- reactiveValues()
+  buffers_reactive <- reactiveValues()
+  
   observe({
     # saving options
     values$save <- input$save
@@ -139,10 +143,11 @@ server <- function(input, output) {
     }
     # selecting buffer size
     if(input$buff_size=="5k"){
-      df_reactive$dfbuffers <- readRDS("../../data/buffers/radio_10kms.rds") %>% 
-        rename(cct=name, buffer=buff_num) %>% 
-        select(-X) %>% select(cct, everything()) %>% 
-        arrange(as.numeric(buffer))
+      df_reactive$dfbuffers <- readRDS("../../data/buffers/df_sec_buffer_5kms_v2.rds")
+      df_reactive$df_schools <- df_buffers_join(df_reactive$df, df_reactive$dfbuffers)
+      
+      
+      df_reactive$projbuffers <- readRDS("../../data/buffers/projections_buffers_5kms.rds")
       # buffer list
       df_reactive$buffers_list <- df_reactive$dfbuffers %>% unique() %>% as.vector()
       # calculate convex hulls
@@ -151,7 +156,6 @@ server <- function(input, output) {
       df_reactive$nodos <- df_reactive$dfbuffers %>% rename(grupo=buffer, name=cct, lat=latitud, lon=longitud)
       # calculate unions
       df_reactive$unions <- st_union(df_reactive$ch_df$ch_polygons) %>%  st_sf()
-      
     } else if (input$buff_size=="10k"){
       df_reactive$dfbuffers <- readRDS("../../data/buffers/radio_10kms.rds") %>% 
                            rename(cct=name, buffer=buff_num) %>% 
@@ -182,10 +186,12 @@ server <- function(input, output) {
     }
     values$cz_id <- input$cz_id
     values$algo  <-  input$net_alg
-    values$selected_list <- comp_communities(buffer=input$cz_id, df_reactive$nodos, df_reactive$df, algorithm=input$net_alg,
-                                             values$save)
-    values$sp_network <- compute_spatial_network(values$selected_list$selected_nodos,
-                                                 values$selected_list$select_relations)
+    
+    
+    need(try(values$selected_list <- comp_communities(buffer=values$cz_id, df_reactive$nodos, df_reactive$df, 
+                                             algorithm=values$algo, values$save)), "help")
+    need(try(values$sp_network <- compute_spatial_network(values$selected_list$selected_nodos,
+                                                 values$selected_list$select_relations)), "help")
     
     values$network <- values$sp_network$network
     values$vert <- values$sp_network$verts
@@ -197,8 +203,14 @@ server <- function(input, output) {
   #### Map
   output$map <- renderLeaflet({
     # elements for spatial network
-    map_layers_v2(values$vert, df_reactive$dfbuffers, df_reactive$ch_df, df_reactive$unions, values$edges,
-               edges_type=values$edges_plot, edges_color=values$edges_color)
+    map_layers_v2(vert=values$vert,
+                  df_buffers=df_reactive$df_schools, 
+                  proj_buffers=df_reactive$projbuffers, 
+                  ch_df=df_reactive$ch_df, 
+                  unions=df_reactive$unions, 
+                  edges=values$edges,
+                  edges_type=values$edges_plot, 
+                  edges_color=values$edges_color)
   })
   #### Markets schools
   output$mkt_members_tbl <-  function() {
@@ -206,7 +218,7 @@ server <- function(input, output) {
   }
   #### Counts for buffers
   output$res_buffer <-  function() {
-    df_reactive$dfbuffers %>% format_buff_cts()
+    df_reactive$df_schools %>% na.omit %>% format_buff_cts()
   } 
   #### Community Stats
   output$community_stats <- function(){
@@ -220,6 +232,12 @@ server <- function(input, output) {
   output$centrality_stats <- function(){
     values$selected_list$central_stats %>% format_ctl() %>%  kable_material(c("striped", "hover"))
   }  
+  # ### Selected relations
+  # output$cz_id < renderUI({
+  #   availablenets <- df_reactive$df_schools %>% na.omit %>% pull(buffer)
+  #   selectInput("cz_id","Zonas de desplazamiento", choices = c(availablenets), selected = 555)
+  #   selectInput()
+  # })
 }
 
 shinyApp(ui, server)
