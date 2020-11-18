@@ -1,271 +1,119 @@
 
-# Reporte de Mercados Educativos
-**CIE**
+# Mercados Educativos en México
+**ITAM - Centro de Investigación en Economía** 
 
-## Datos
+## Shiny App: Visualización de áreas de desplazamiento y comunidades
 
-### Fuentes:
+Esta herramienta de visualización se generó utilizando la librería `shiny` del lenguage `R`, y tiene como objetivo presentar de manera práctica e informativa los resultados del ejercicio de generación de mercados educativos en México a nivel primaria y secundaria por medio de algorítmos de redes.
 
-- INIFED
-- Geopaquetes
-- SEP
+La visualización general de la aplicación es la siguiente: 
 
+![](imgs/shiny_mapa.png)
 
-### Filtros:
+En las siguientes secciones se documenta su uso. 
 
-- Se omitieron aquellas instituciones cuyas coordenadas se encontraran fuera de los puntos extremos definidos para México[^1], es decir, que tuvieran latitud por fuera del rango, $\left[15,33\right]$, y longitudes por fuera del rango, $\left[-120, -85\right]$.
+### Mapa exploratorio:
 
-[^1]: Correspondientes a: Isla mujeres (Quintana Roo) [Punto más oriental]; Roca Elefante en Isla de Guadalupe [Punto más occidental]; Desembocadura del río Suchiate (Chiapas) [punto más meridional]; y Monumento 206 (Baja California) [punto más septentrional].
+El mapa exploratorio fue diseñado utilizando la librería `leaflet` y poder medio de las funciones de la misma puede ser modificado.  
 
+El mapa es dinámico y el menú de opciones de visualización se presenta en la siguiente subsección. 
 
-### Grafos
+**Panel: Mapa**
 
-La definición de mercados educativos utilizó modelos de grafos y construyó en dos pasos: i) se computan _commuting areas_[^2] utilizando los datos de municipio de la residencia de los estudiantes y de las escuelas; ii), dentro de esas _commuting areas_, se usaron métodos de agrupación de aristas en cada grafo construido con las escuelas dentro de la _commuting area_. 
+Se incorporaron 7 capas al mapa, las cuales se pueden activar o desactivar por medio de un menú desplegable al cual se puede acceder en la esquina superior derecha de la sección donde se visualiza el mapa.
 
-[^2]: Territorios en los cuales gente con ciertas características socioeconómicas y geográficas en común se desplaza diariamente.
+![](imgs/shiny_desp.png)
 
+- Escuelas
 
-En detalle, para calcular los pesos en las artistas, se construyeron matrices de adyacencia que dicen cuántos alumnos tienen en común cada par de colegios, para un periodo dado de tiempo y restringiendo la muestra a alumnos que se cambian entre escuelas _switchers_. 
+Define si se desean adicionar todas las escuelas consideradas en el ejercicio. En la imagen de abajo, el círculo verde con un número 4 indica que en ese punto hay 4 escuelas. Si se hace zoom sobre esa área será posible visualizarlas. 
 
-Utilizando la matriz de adyacencia, se obtuvieron redes con las cuales se extrajeron los mercados utilizando la función `getLinkCommunities` del paquete `linkcomm ` de `R`. La función utiliza el _coeficiente de Tanimoto_ para  obtener la similitud entre los aristas:
- 
+![](imgs/shiny_escuelas.png)
 
-$$
-S\left(e_{i k}, e_{j k}\right)=\frac{\mathbf{a}_{i} \cdot \mathbf{a}_{j}}{\left|\mathbf{a}_{i}\right|^{2}+\left|\mathbf{a}_{j}\right|^{2}-\mathbf{a}_{i} \cdot \mathbf{a}_{j}}
-$$ {#eq: tanimoto}
+- Buffers
 
-donde $a_{i}$ corresponde a  un vector que describe los pesos de los enlaces entre el nodo $i$ y los nodos en las vecindades de primer orden de los nodos $i$ y $j$. Esta medida es igual a $0$ en caso de que no haya dicha conexión).
+Permite visualizar los buffers de tamaño selecionado durante todo el ejercicio. En el siguiente ejemplo se visualizan algunos para el caso donde el radio de los mismos es de 5 kms. 
 
-Una dificultad para implementar este método con los datos de México es que no están disponibles los domicilios de los alumnos, por lo tanto, resulta difícil construir las _commuting areas_. Por otro lado, el algoritmo falla en _commuting areas_ con menos de 20 escuelas.
+![](imgs/shiny_buffers.png)
 
-# Metodología
+- Envolventes convexas
 
-Nuestro enfoque para abordar la creación de _commuting areas_ en México plantea dos caminos diferentes. Por un lado, utilizamos _buffers_ para acotar zonas territoriales donde pueden existir los mercados educativos. La creación de mercados educativos se realiza con métodos de grafos.
+Incluye las envolventes convexas asociadas a los buffers analizados. 
 
-### Buffers
+![](imgs/shiny_ch.png)
 
-Un _buffer_, es una área que se define  a partir de una estructura espacial. En este caso, son de tipo circular con un radio definido en kilómetros y se forman a partir de las coordenadas de cada escuela. En particular, para esta implementación utilizamos la proyección UTM zona 15N con EPSG 6370 para México:[^3]. La computación se realizó en lenguage `R`, y se encuentra disponible en el apéndice \ref{computo_buffs}. 
+Incluye la unión de envolventes convexas asociadas a los buffers analizados. 
 
-[^3]: Ver [https://epsg.io/6370](https://epsg.io/6370).
+- Unión de envolventes convexas
 
-A modo de ejemplo, considere la figura de abajo,  donde se dibujan los _buffers_ asoaciados a 11 escuelas de secundaria en Veracruz:
+![](imgs/shiny_uch.png)
 
+- Nodos y aristas
 
-![Mapa de Veracruz con la ubicación de 11 escuelas de secundaria. Las áreas demarcadas en azul traslúcido denotan  _buffers_ circulares de 2 kms. Los puntos oscuros denotan la ubicación de la respectiva escuela.](imgs/buffer_ejemplo_2kms.png){ width=70% }
+Incluyen las aristas y los nodos de la red del área de desplazamiento seleccionada utilizadas para el ejercicio de detección de comunidades. 
 
-Una vez se han computado los respectivos  _buffers_ para la totalidad de escuelas en el conjunto de datos, se procede a identificar cuales están sobrepuestos y comparten intersecciones, y por lo tanto, como conjunto, conforman una _commuting areas_. Como se puede notar en la figura anterior, esto sucede para los conjuntos $\{3,4,5,6\}$ y $\{7,8\}$. Lo que implica que en total se tienen 7 _commuting areas_.
+En la siguiente imagen se muestran estos elementos para el área de desplazamiento 505.
 
+![](imgs/shiny_nw.png)
 
-| Buffers | Nro. de buffers  | Promedio | Mediana | Desviacion estandar | Min. | Máx. |
-|---------|------------------|----------|---------|---------------------|--------|--------|
-| 10 kms  | 383              | 50.75    | 1       | 800                 | 1      | 15,661  |
-| 15 kms  | 141              | 137.87   | 2       | 1,533.45             | 1      | 18,215  |
+Cabe denotar que estos elementos tienen información interactiva que da información sobre la red. Por ejemplo, si se pone el puntero encima de los nodos, se presenta el CCT asociado a la escuela y el mercado educativo al que pertenece:
 
+![](imgs/shiny_infonodos.png)
 
-Las tablas con las escuelas y buffers y sus respectivas escuelas se encuentran en los archivos:
+De igual forma, si se sitúa el puntero encima de las aristas de la red, se muestra el flujo de estudiantes (bidireccional) que hubo entre una y otra escuela:
 
-- `buffer/buffers_10kms.csv`
-- `buffer/buffers_15kms.csv`
+![](imgs/shiny_infoaristas.png)
 
-- Buffers de 10 kms
+**Panel: Opciones**
 
-![Mapa de México con _buffers_ de 10 kms. Los puntos oscuros denotan la ubicación de la respectiva escuela. Nota: Algunos colores similares no implicanque las escuelas pertenezcan al mismo _buffer_. Dada la visualización generada, la gama de colores no abarca la totalidad de _buffers_ generado](imgs/buffers_10kms.png){ width=70% }
+El menú de opciones de visualización se presenta en el panel azul de la parte derecha de la aplicación:
 
-- Buffers de 15 kms
+![](imgs/shiny_opciones.png)
 
-![Mapa de México con _buffers_ de 15 kms. Los puntos oscuros denotan la ubicación de la respectiva escuela.](imgs/buffers_15kms.png){ width=70% }
+Las opciones disponibles son:
 
+- _Nivel educativo_: Se selecciona si se desea evaluar el flujo de estudiantes de primaria o secundaria. 
 
+- _Radio de los buffers:_: Se indica el radio de los buffers calculados, las opciones disponibles son: 5 kms, 8 kms, 12 kms, y 15 kms. 
 
-## Construcción de Switchers[^4]
+- _Zona de desplazamiento_: Indica el ID de la zona de desplazamiento sobre la cual se quiere analizar la existencia de comunidades. 
 
-[^4]: Trabajo elaborado en su totalidad por Bernardo y Paola.
+- _Algoritmo de redes_ : Indica el algoritmo utilizado para detección de comunidades. Las opciones incluyen: fast greedy, Walktrap, LeadingEigen, LabelProp, y Multi-level. La implementación de estos algoritmos se realiza por medio de la librería `igraph`.
 
-El objetivo de esta tabla es saber cuántos alumnos se cambiaron de la escuela A a la escuela B en un periodo de tiempo.
+- _Tipo de aristas_ : Indica el tipo de relaciones que se quieren evaluar en la visualización de la red (actualmente se centra en el flujo bidireccional de estudiantes entre escuela) 
 
-Para construirla, se utilizaron las bases de datos de la Evaluación Nacional de Logros Académicos en Centros Escolares (ENLACE). En esta base, cada alumno se identifica únicamente por su Clave Única de Registro de Población (CURP) y sabemos la Clave de Centro de Trabajo (CCT). Utilizando los datos desde el 2006 hasta el 2013 (7 años) se identificaron los alumnos que cambiaron de escuela. 
- 
+- _Color de las aristas_ : permite cambiar el color de las aristas de forma que permita una visualización más apropiada. 
 
-## Métricas de evaluación
+**Panel: Composición de áreas de desplazamiento**
 
-La métrica a utilizar para evaluar los diferentes algoritmos de agrupamiento será la modularidad (_modularity_). Esta medida heurística está diseñada para medir para medir la fuerza de una división de una red en comunidades.[^4] Es decir,  intentar cuantificar qué tan "cohesiva" es una separación de nodos en grupos.[^5]
+Muestra el número de escuelas que tiene determinada área de desplazamiento. 
 
-[^4]: La modularidad tiene un límite de resolución y como consecuencia, no es capaz de detectar comunidades pequeñas.
+![](imgs/shiny_cz.png)
 
-[^5]: Ver [Notas de Clase](https://heuristic-bhabha-ae33da.netlify.app/detección-de-comunidades.html) del curso Métodos análitico 2020 (ITAM), sección detección de comunidades, impartido por Luis Felipe González. 
+En la parte de abajo de la tabla se muestra información adicional sobre el número (porcentaje) de escuelas que tienen más de uno, dos o tres miembros. 
 
-La modularidad de una gráfica no dirigida y vértices con una agrupación dada $g$ se define como:
+![](imgs/shiny_cz2.png)
 
-$$
-   Q = \frac{1}{2m}{\sum_{u,v} \left ( A_{u, v} - \frac{k(u)k(v)}{2m} \right)I(g(u), g(v))} \label{eq:modularidad}
-$$
+**Panel: Métricas del algoritmo**
 
-donde $A$ es la matriz de adyacencia y $k(u)$ es el grado de $u$. 
-
-Se elijió esta métrica de evaluación puesto que da un indicio de la solidez de la conexión entre escuelas (nodos) al interior de los mercados educativos (comunidades). En este sentido, nos permite ver qué tan buenos son los mercados que se están generando. Así, mayor modularidad implica que las escuelas que están en el mismo mercado están altamente interconectadas, y por lo tanto, los alumnos rotan de manera "razonable" entre ellas.
-
-
-## Apéndices
-
-### Código
-
-Las librerías que se utilizaron para realizar el cómputo de los algorimos de mercados educativos son:
-
-```r
-library(easypackages)
-libraries("rgdal", "raster", "rgeos", "sp", "scales", "maptools", "GISTools", "tidyverse", "data.table", 
-          "sf", "plotly", "RColorBrewer", "htmlwidgets", "purrr", "mapview", "RANN")
-
-```
-
-# Cómputo de buffers {#computo_buffs}
-
-```r
-create_buffers <- function(n_escuelas, buffer_r=1000,vec_lon=df_o$longitud, vec_lat=df_o$latitud){
-  "
-  Tras recibir un vector de longitudes  y latitudes, toma aleatoriamente una muestra de observaciones y devuelve matriz con
-  coordenadas y con el número buffer asociado. También deja en el entorno global la variable 'buffers_sf' que tiene la información
-  espacial de los buffers calculados.
-  * argumentos:
-    ** n_escuelas: # escuelas que se toman al azar de la matriz de coordenadas
-    ** buffer_r: radio del buffer a crear (en mts)
-    ** vec_lon: vector con las longitudes de las escuelas
-    ** vec_lat: vector con las latitudes de las escuelas
-  * salidas:
-    ** buff_mat: matriz con coordenadas y con el número buffer asociado
-  "
-  set.seed(333814)
-  matrix_df <- data.frame(cbind(vec_lon, vec_lat)) # conformar matriz de coordenadas
-  mat <- matrix_df[sample(nrow(matrix_df), n_escuelas, replace = FALSE), ] # aleatoreamente tomar n_escuelas escuelas
-  names(mat) <- c("longitud", "latitud")
-  mat_info <- mat # matriz que tendrá info de coordenadas y buffers
-  # proyecciones
-  unproj <- CRS("+proj=longlat +datum=WGS84") # proyección WGS84 
-  proj <- CRS("+init=epsg:6370")  # proyectado a UTM para MExico Ver: https://epsg.io/6370 // 6362
-  coordinates(mat) <- c(x="longitud", y="latitud") # convertir a shapefile
-  proj4string(mat) <- unproj   # asignar una proyección
-  mat <<- spTransform(mat, proj) # reproyectar el shapefile a WGS84 UTM 15N (para México). 
-  
-  # crear buffers (donde width está en mts, i.e. 1000=1km)
-  buffers <<- gBuffer(mat, width=buffer_r) 
-  buffers_sf <<- st_as_sf(buffers) 
-  
-  # añadir columna a matriz para que diga de qué buffer es
-  mat_info$buff_num <- as.character(over(mat, disaggregate(buffers)))
-  print(paste("# buffers: ", length(unique(mat_info$buff_num))))
-  buff_mat <<- mat_info
-  
-  return(buff_mat)
-}
-```
-
-### Gráficas de buffers
-
-- Dos funciones para hacer gráficas de los _buffers_ en el mapa de México.
-
-
-```r
-map_buffers_ggplot <- function(nivel_agg=2, mat_buffers){
-  "
-  =======NO RECOMENDADO ver map_buffers_mapview=======
-  (NO RECOMENDADO: genera gráficas en HTML muy pesadas y el mapa es plano)
-  Hace el mapa interactivo de mexico clasificando escuelas por buffers con colores
-  * argumentos:
-    ** nivel_agg (int):
-        - 1: mapa plano de México
-        - 2: 1, con entidades
-        - 3: 1, con municipios
-    ** matriz_buffers (mat): matriz con coordenadas e información de buffers (ver create_buffers)
-            debe tener cols: longitud, latitud y buff_num
-    
-  * salidas:
-    ** mapa de méxico con buffers
-  "
-  # descargar datos para el mapa de mexico
-  mex <- getData('GADM', country="MEX", level=nivel_agg)
-  mex <- gSimplify(mex, tol=0.01, topologyPreserve=TRUE) # simplificar mapa para graficarlo de forma veloz
-  mex_sf <- st_as_sf(mex)
-  # definir paleta de colores
-  n_buffer <- length(unique(buff_mat$buff_num))
-  mycolors <- colorRampPalette(brewer.pal(12, "Set3"))(n_buffer)
-  # mapa de ggplot
-  map <- ggplot() + geom_sf(data = mex_sf) + 
-    geom_sf(data = buffers_sf, color="blue", size = 1.5) +  
-    geom_point(data=mat_buffers, aes(x=longitud, y=latitud, color = factor(buff_num)), 
-               size = 1, show.legend = FALSE) +
-    scale_fill_manual(values = mycolors)
-}
-
-map_buffers_mapview <- function(mat_buffers){
-  "
-  =======RECOMENDADO ver map_buffers_mapview=======
-  ver: https://r-spatial.github.io/mapview/articles/articles/mapview_02-advanced.html
-  Hace el mapa interactivo de mexico clasificando escuelas por buffers. Se muestran los buffers y las
-  escuelas.
-  * argumentos:
-    ** matriz_buffers (mat): matriz con coordenadas e información de buffers (ver create_buffers)
-            debe tener cols: longitud, latitud y buff_num
-  * salidas:
-    ** mapa de méxico con buffers y escuelas 
-  "
-  ## mapa de mapview
-  df.sf <- mat_buffers %>%
-    st_as_sf( coords = c( "longitud", "latitud" ), crs = 4326)
-  
-  # note que buffers_sf está definida globalmente en la función create_buffers, la cual se debe 
-  # ejecutar antes
-  map <- mapview::mapview(list(buffers_sf, df.sf), alpha = c(0.1, 0.7))
-}
-
-```
-
-- Ejemplo completo de implementación:
-
-```r
-######## Carga de los datos
-df <- fread("./../../data/processed/agregado_dist_sec.csv")
-
-# df con escuelas de origen
-df_o <- df %>% select(cct_o, longitud_o, latitud_o) %>% 
-  distinct(cct_o, .keep_all = TRUE) %>%  rename(latitud=latitud_o, longitud=longitud_o)
-head(df)
-# df con escuelas de destino
-df_d <- df %>% select(cct_d, longitud_d, latitud_d) %>% 
-  distinct(cct_d, .keep_all = TRUE) %>%  rename(latitud=latitud_d, longitud=longitud_d)
-
-## longitud
-max(na.omit(df_o$longitud))  #-86.72559
-min(na.omit(df_o$longitud))  # -117.1201 
-sum(is.na(df_o$longitud))    # 73
-
-max(na.omit(df_o$latitud))   # 32.71284
-min(na.omit(df_o$latitud))   # 14.59373
-sum(is.na(df_o$latitud))     # 75
-
-# sacar los que están fuera de mexico
-df_o$latitud[df_o$latitud < 15] <- NA
-df_o$latitud[df_o$latitud > 33] <- NA
-df_o$longitud[df_o$longitud > -85] <- NA
-df_o$longitud[df_o$longitud < -120] <- NA
-
-# conservar los que no tienen NAs
-df_o <- df_o %>%  filter(!is.na(latitud), !is.na(longitud))
-
-# buffers 
-
-radio_buffer <- 2000
-nro_escuelas <- 500
-matriz_test <- create_buffers(n_escuelas=nro_escuelas, buffer_r=radio_buffer,vec_lon=df_o$longitud, vec_lat=df_o$latitud)
-nro_buffers <- length(unique(matriz_test$buff_num))
-# realizar mapa
-title <- paste("Número de buffers: ", nro_buffers, "- Radio de buffers: ", radio_buffer/1000, "kms")
-#mapa <- map_buffers_ggplot(nivel_agg=1, mat_buffers=matriz_test) + ggtitle(title) + theme_classic()
-mapa1 <- map_buffers_mapview(matriz_test)
-mapa1
-# mapa1
-# # plotly
-# ## títlulo de la gráfica a guardar
-title_graph <- paste0("mex_bufs_ejemplo_", radio_buffer/1000, "kms_nb", nro_buffers, ".html")
-mapshot(mapa1, url = title_graph)
-
-```
+Muestra las métricas de evaluación del algoritmo utilizado para la detección de comunidades: 
+
+![](imgs/shiny_metricasalgo.png)
+
+**Panel: Estadísticas de mercados**
+
+Muestra las estadísticas generales de las comunidades generadas al interior del área de desplazamiento seleccionada. 
+
+![](imgs/shiny_comunidades.png)
+
+**Panel: Medidas de centralidad**
+
+Muestra las medidas de centralidad de los nodos analizados en la red generada en el área de desplazamiento seleccionada. 
+
+![](imgs/shiny_centralidad.png)
+
+**Panel: Miembros de comunidades**
+
+Muestra en una tabla el CCT de cada escuela y el mercado educativo al que pertenece de acuerdo al algoritmo seleccionado. 
+
+![](imgs/shiny_miembros.png)
