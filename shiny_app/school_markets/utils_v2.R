@@ -394,6 +394,39 @@ get_community_stats <- function(fc, current_group,save=TRUE){
   return(stats)
 }
 
+get_community_stats_v2 <- function(fc, current_group,save=TRUE, type){
+  sizes_fc <- sizes(fc)
+  stats <- data.frame(
+    algoritm =   algorithm(fc),
+    modularity = modularity(fc),
+    num_groups =   length(fc) ,
+    mean_size = mean(sizes_fc),
+    median_size = median(sizes_fc),
+    max_size = max(sizes_fc),
+    min_size= min(sizes_fc)
+  )
+  
+  if (save==TRUE){
+    # create directory if not exists
+    dir.create(file.path("../shiny_app/school_markets/results")) 
+    
+    type_dir <- str_c("../shiny_app/school_markets/results/", type)
+    dir.create(file.path(type_dir))
+    
+    buff_dir <- str_c(type_dir, "/buffer_", current_group)
+    dir.create(file.path(buff_dir))
+    
+    algo_dir <- str_c(buff_dir,"/", algorithm)
+    dir.create(file.path(algo_dir))
+    
+    
+    file_name <- str_c(algo_dir, "/algo_stats.csv")
+    sub_df <- select_nodos %>% dplyr::select(name, grupo, sub_grupo) %>% arrange(sub_grupo)
+    write_csv(stats, file_name)
+  }
+  return(stats)
+}
+
 save_map <- function(select_nodos,algorithm, current_group,num_plot=10){
   top_groups <- select_nodos %>% 
     group_by(sub_grupo) %>% 
@@ -442,6 +475,41 @@ save_subgroups <- function(fc, select_nodos,algorithm,current_group, save=TRUE){
   }
   return(select_nodos)
 }
+
+save_subgroups_v2 <- function(fc, select_nodos,algorithm,current_group, save=TRUE, buffer, type){
+  fccommunity<- membership(fc)
+  
+  select_nodos$sub_grupo <- 0
+  tam <- nrow(select_nodos)
+  for (i in 1:tam){
+    escuela <- select_nodos$name[i] 
+    select_nodos$sub_grupo[i] <- fccommunity[escuela][[1]]
+  }
+  
+  if (save==TRUE){
+    # create directory if not exists
+    dir.create(file.path("../shiny_app/school_markets/results")) 
+    
+    type_dir <- str_c("../shiny_app/school_markets/results/", type)
+    dir.create(file.path(type_dir))
+    
+    buff_dir <- str_c(type_dir, "/buffer_", current_group)
+    dir.create(file.path(buff_dir))
+    
+    # type_dir <- str_c(buff_dir,"/", type)
+    # dir.create(file.path(type_dir))
+    
+    algo_dir <- str_c(buff_dir,"/", algorithm)
+    dir.create(file.path(algo_dir))
+    
+
+    file_name <- str_c(algo_dir, "/subgroups_members.csv")
+    sub_df <- select_nodos %>% dplyr::select(name, grupo, sub_grupo) %>% arrange(sub_grupo)
+    write_csv(sub_df, file_name)
+  }
+  return(select_nodos)
+}
+
 
 #-----------------------------
 # Subgroup stats
@@ -519,6 +587,50 @@ get_stats_group <- function(select_nodos, current_group, algorithm,save=TRUE) {
   
 }
 
+get_stats_group_v2 <- function(select_nodos, current_group, algorithm,save=TRUE,type) {
+  # algorithm
+  sub_results <- data.frame(group = -1,
+                            mean_dist = -1,
+                            max_dist = -1,
+                            min_dist = -1,
+                            median_dist = -1,
+                            convex_hull  = -1,
+                            num_elem_subgroup = -1,
+                            priv = -1)
+  
+  list_groups <- unique(select_nodos$sub_grupo) %>% sort()
+  tam <- length(list_groups) 
+  for (i in 1:tam){
+    curr_group <- list_groups[[i]] 
+    r <- get_stats_sub_group(curr_group,select_nodos)
+    sub_results <- rbind(sub_results, r)
+  }
+  
+  sub_results <- sub_results %>% filter(priv != -1)
+  
+  if (save==TRUE){
+    # create directory if not exists
+    dir.create(file.path("../shiny_app/school_markets/results")) 
+    
+    type_dir <- str_c("../shiny_app/school_markets/results/", type)
+    dir.create(file.path(type_dir))
+    
+    buff_dir <- str_c(type_dir, "/buffer_", current_group)
+    dir.create(file.path(buff_dir))
+    
+    algo_dir <- str_c(buff_dir,"/", algorithm)
+    dir.create(file.path(algo_dir))
+    
+    
+    file_name <- str_c(algo_dir, "/subgroups_stats.csv")
+    sub_df <- select_nodos %>% dplyr::select(name, grupo, sub_grupo) %>% arrange(sub_grupo)
+    write.csv(round(sub_results, 2),file_name)
+
+  }
+  
+  return(sub_results)
+  
+}
 #-----------------------------
 # Network stats
 #-----------------------------
@@ -559,6 +671,41 @@ get_centrality_stats <- function(school_network,current_group, save=TRUE){
   
 }
 
+get_centrality_stats_v2 <- function(school_network,current_group, save=TRUE){
+  # https://rdrr.io/cran/tidygraph/man/centrality.html
+  school_network  <- school_network %>%  as_tbl_graph %>% 
+    tidygraph::activate(nodes) %>% 
+    mutate(
+      # alpha = centrality_alpha(weights = weight),
+      authority = centrality_authority(weights = weight),
+      betweenness = centrality_betweenness(weights = weight),
+      eigen = centrality_eigen(weights = weight),
+      hub = centrality_hub(weights = weight),
+      pagerank = centrality_pagerank(weights = weight),
+      subgraph = centrality_subgraph(),
+      degree = centrality_degree()
+    )
+  
+  resumen_central <- school_network %>% as_tibble()
+  
+  if (save==TRUE){
+
+    dir.create(file.path("../shiny_app/school_markets/results")) 
+    
+    type_dir <- str_c("../shiny_app/school_markets/results/", type)
+    dir.create(file.path(type_dir))
+    
+    buff_dir <- str_c(type_dir, "/buffer_", current_group)
+    dir.create(file.path(buff_dir))
+    
+    file_name <- str_c(buff_dir, "/centrality.csv")
+    write_csv(resumen_central, file_name)
+  }
+  
+  
+  return(resumen_central)
+  
+}
 #-----------------------------
 # Comparison algoritms
 #-----------------------------
@@ -648,6 +795,32 @@ tbls_mrkt_members <- function(select_nodos, current_group, algorithm, save=T) {
   out <- list("miembros"=tbl_miembros, "com_stats"=com_stats, "algo_stas"=algo_tbl)
   return(out)
 }
+tbls_mrkt_members_v2 <- function(select_nodos, current_group, algorithm, save=T, type) {
+  # School of each market
+  tbl_miembros <- select_nodos %>% rename(CCT=name, Latitud=lat, Longitud=lon, Mercado=sub_grupo) %>% 
+    arrange(Mercado) %>% 
+    mutate_at(vars(Mercado), funs(factor))
+  tbl_miembros <- tbl_miembros[c("CCT", "Mercado", "Latitud", "Longitud" )]
+  # community stats
+  com_stats <- get_stats_group_v2(select_nodos, current_group, algorithm, save, type)%>% 
+    filter(group>0) %>% 
+    mutate_at(vars(group), funs(factor)) %>% 
+    rename(Mercado=group, DistMed=mean_dist, MaxDist=max_dist, MinDist=min_dist,
+           MedDist=median_dist, Area=convex_hull, N=num_elem_subgroup, Privs=priv) %>% 
+    select(Mercado, N, everything()) %>% arrange(-N) %>% round_df(4)
+  # algorithm stats
+  algo_tbl <- get_community_stats_v2(fc, current_group, save, type) %>% rename(Algoritmo=algoritm, 
+                                                                      Modularidad=modularity,
+                                                                      Mercados=num_groups,
+                                                                      Media=mean_size,
+                                                                      Mediana=median_size,
+                                                                      Max=max_size,
+                                                                      Min=min_size) %>% round_df(2)
+  
+  out <- list("miembros"=tbl_miembros, "com_stats"=com_stats, "algo_stas"=algo_tbl)
+  return(out)
+}
+
 
 comm_stats_rep <- function(fc, algorithm) {
   tbl_mrkt_grl <- get_community_stats(fc, current_group)
