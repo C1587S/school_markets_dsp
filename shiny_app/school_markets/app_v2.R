@@ -37,7 +37,7 @@ ui <- dashboardPage(
               column(width = 9,
                      # Map
                      box(width = NULL, solidHeader = TRUE,
-                         leafletOutput("map", height = 400)
+                         leafletOutput("map", height = 700)
                      ),
                      # Box with algo stats
                      box(width = NULL, status = "success",
@@ -143,11 +143,11 @@ server <- function(input, output) {
     }
     # selecting buffer size
     if(input$buff_size=="5k"){
-      df_reactive$dfbuffers <- readRDS("../../data/buffers/df_sec_buffer_5kms_v2.rds")
+      df_reactive$dfbuffers <- readRDS("../../data/buffers/df_buffers_5kms_sec.rds")$df_buffers
       df_reactive$df_schools <- df_buffers_join(df_reactive$df, df_reactive$dfbuffers)
       
       
-      df_reactive$projbuffers <- readRDS("../../data/buffers/projections_buffers_5kms.rds")
+      df_reactive$projbuffers <- readRDS("../../data/buffers/df_buffers_5kms_sec.rds")$buffers_proj
       # buffer list
       df_reactive$buffers_list <- df_reactive$dfbuffers %>% unique() %>% as.vector()
       # calculate convex hulls
