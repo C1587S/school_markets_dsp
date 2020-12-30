@@ -1,3 +1,4 @@
+setwd("~/Desktop/testing/notebooks")
 source('../shiny_app/school_markets/utils_v2.R')
 library(leaflet)
 library(mapview)
@@ -27,9 +28,9 @@ for (type in type_list){
   } else if(type=="10kms"){
     dfbuffers <- readRDS("../data/buffers/dfX_buffers_10kms_sec.rds")$df_buffers 
   }
-  # buff_list <- buffs %>% group_by(buffer) %>% summarise(n=n()) %>%
-  #                       filter(n>50) %>%  arrange(n) %>%  select(buffer) %>% pull()
-  buff_list <- c(41, 34, 3)
+  buff_list <- dfbuffers %>% group_by(buffer) %>% summarise(n=n()) %>%
+                        filter(n>50) %>%  arrange(n) %>%  select(buffer) %>% pull()
+  # buff_list <- c(41, 34, 3)
   # buffers
   i <- 1
   for (buff in buff_list){
@@ -62,15 +63,15 @@ for (type in type_list){
       algorithm <- algo
       
       if (algorithm=="fg"){
-        fc <<- cluster_fast_greedy(school_network) 
+        try(fc <- cluster_fast_greedy(school_network) )
       } else if (algorithm=="wt"){
-        fc <- cluster_walktrap(school_network)
+        try(fc <- cluster_walktrap(school_network))
       } else if (algorithm=="lp"){
-        fc <- cluster_label_prop(school_network)
+        try(fc <- cluster_label_prop(school_network))
       } else if (algorithm=="le"){
-        fc <- cluster_leading_eigen(school_network)
+        try(fc <- cluster_leading_eigen(school_network))
       } else if (algorithm=="cl"){
-        fc <- cluster_louvain(school_network)
+        try(fc <- cluster_louvain(school_network))
       }
       
       algorithm <- str_replace(algorithm(fc), " ", "_")
