@@ -60,6 +60,43 @@ calc_buffers <- function(db, radius){
   return(buffers_outs)
 }
 
+calc_buffers_v2 <- function(db, radius, save=TRUE){
+  "Calculates buffers for schools
+  Inpunts: 
+      - df (dataframe): Dataframe with longitud and latitud cols. 
+      - radius (int): Radius in mts for computing buffers
+  Outputs:
+      - df_buffers (dataframe): Coordinates, schools, and buffer number
+      - buffers_proj (sp). Spatial Object with projected buffers.
+  Example:
+      - buff_test <- calc_buffers(schools_df, 4000)
+  "
+  db_sp <- db # create a df to be converted to a spatial object
+  ## projections
+  unproj <- CRS("+proj=longlat +datum=WGS84")
+  proj <- CRS("+init=epsg:6370")  
+  coordinates(db_sp) <- c(x="longitud", y="latitud") 
+  proj4string(db_sp) <- unproj  
+  db_sp <- spTransform(db_sp, proj) 
+  ## calculate buffers
+  buffers <- gBuffer(db_sp, width=radius) 
+  db$buffer <- as.character(over(db_sp, disaggregate(buffers)))
+  db <- db %>% arrange(as.numeric(buffer))
+  # for graphing buffers
+  buffers_proj <- spTransform(buffers, '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+  # return both df and spdf for graph maps
+  buffers_outs <- list("df_buffers"= db, "buffers_proj"=buffers_proj)
+  if (save==TRUE){
+    dir.create(file.path("../data/buffers")) # create directory if not exists
+    kms <- radius/1000
+    filename<- paste0("buffers_",kms,"kms.rds")
+    saveRDS(buffers_proj, paste0("../data/buffers/projections_", filename))
+    saveRDS(buffers_outs, paste0("../data/buffers/df_", filename))
+  }
+  
+  return(buffers_outs)
+}
+
 calc_convexhulls <- function(df_buffers){
   "Calculates convexHulls for schools by using buffers
   Inpunts: 
@@ -586,6 +623,8 @@ get_stats_group <- function(select_nodos, current_group, algorithm,save=TRUE) {
   return(sub_results)
   
 }
+
+
 
 get_stats_group_v2 <- function(select_nodos, current_group, algorithm,save=TRUE,type) {
   # algorithm
