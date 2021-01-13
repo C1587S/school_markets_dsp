@@ -1,4 +1,6 @@
-setwd("~/Desktop/testing/notebooks")
+# setwd("~/Desktop/testing/notebooks")
+options(warn=-1)
+setwd("~/Github/school_markets_dsp/notebooks")
 source('../shiny_app/school_markets/utils_v2.R')
 library(leaflet)
 library(mapview)
@@ -9,7 +11,7 @@ library(crayon)
 #  buffer size
 type_list <- c("5kms", "10kms")
 # algorithms list
-algo_list <- c("fg", "wt", "lp", "le", "cl")
+algo_list <- c("fg", "wt", "lp", "cl")  # "le"
 #  Secundaria
 df <- readRDS("../data/agregados/agregado_dist_sec_v2.rds")
 # additionals
@@ -29,8 +31,7 @@ for (type in type_list){
     dfbuffers <- readRDS("../data/buffers/dfX_buffers_10kms_sec.rds")$df_buffers 
   }
   buff_list <- dfbuffers %>% group_by(buffer) %>% summarise(n=n()) %>%
-                        filter(n>50) %>%  arrange(n) %>%  select(buffer) %>% pull()
-  # buff_list <- c(41, 34, 3)
+                        filter(n>100) %>%  arrange(n) %>%  select(buffer) %>% pull()
   # buffers
   i <- 1
   for (buff in buff_list){
@@ -61,7 +62,7 @@ for (type in type_list){
       cat(red("***********************", "\n")) 
       
       algorithm <- algo
-      
+      fc <- c()
       if (algorithm=="fg"){
         try(fc <- cluster_fast_greedy(school_network) )
       } else if (algorithm=="wt"){
@@ -79,7 +80,9 @@ for (type in type_list){
       
       # tables with community members
       mrkt_members_tbl <- tbls_mrkt_members_v2(select_nodos, current_group, algorithm, save=save, type=type)
-      
+      # save community
+      path_nwk <- str_c("../shiny_app/school_markets/results/", type, "/buffers_with_comms.rds")
+      save_network(fc, type, current_group, algorithm)
     }
     i <- i + 1
   }

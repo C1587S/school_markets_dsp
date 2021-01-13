@@ -19,11 +19,11 @@ installations <- function(paquete) {
   }
 }
 
-packages <- c('corrr', 'data.table', 'ddpcr', 'devtools', 'dplyr',  'plotly', 
-              'foreign', 'GISTools', 'ggraph', 'ggmap','glmnet', 'haven', 'htmlwidgets',
-              'htmltools', 'igraph', 'leaflet','linkcomm', 'maptools', 'mapview', 
-              'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 'rgdal', 
-              'rgeos',  'rlist', 'scales', 'sjlabelled', 'sf', 'sp', 'tidyverse',
+packages <- c('corrr', 'data.table', 'ddpcr', 'dplyr', "stringr",
+              'foreign', 'ggraph','glmnet', 'haven', 'htmlwidgets',
+              'htmltools', 'igraph', 'leaflet','linkcomm', 'maptools', 
+              'network', 'RANN', 'raster', 'readr', 'RColorBrewer', 
+              'scales', 'sjlabelled', 'sp', 'sf',
               'tidygraph', 'GeoRange', 'geosphere', 'igraphdata', 'shinydashboard',
               'leaflet.extras', 'kableExtra', 'formattable', 'shinydashboard', 'usethis')
 
@@ -547,7 +547,23 @@ save_subgroups_v2 <- function(fc, select_nodos,algorithm,current_group, save=TRU
   return(select_nodos)
 }
 
+save_network <- function(nwk, type, current_group, algorithm){
+  # create directory if not exists
+  dir.create(file.path("../shiny_app/school_markets/results")) 
+  
+  type_dir <- str_c("../shiny_app/school_markets/results/", type)
+  dir.create(file.path(type_dir))
+  
+  buff_dir <- str_c(type_dir, "/buffer_", current_group)
+  dir.create(file.path(buff_dir))
 
+  ntw_dir <- str_c(buff_dir,"/", algorithm)
+  dir.create(file.path(ntw_dir))
+  
+  # save network
+  file_name <- str_c(ntw_dir, "/network.rds")
+  saveRDS(nwk, file_name)
+}
 #-----------------------------
 # Subgroup stats
 #-----------------------------
