@@ -1,0 +1,2 @@
+algoritm,modularity,num_groups,mean_size,median_size,max_size,min_size
+fast greedy,0.4810381842107458,4,14.25,15.5,24,2
